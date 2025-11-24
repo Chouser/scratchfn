@@ -97,6 +97,9 @@
                                   :next (second (:top next-flat))})]]
                      (mapcat :blocks [fields inputs next-flat]))})))
 
+(defn top-level-block [op]
+  (->> op (flatten-block nil) :blocks (into {})))
+
 #_(flatten-blockmap 0 {:VARIABLE (variable-field "lessonNumber" 101010)})
 #_(binding [*block-counter* 0]
   (flatten-block nil {:opcode "data_deleteoflist"
@@ -111,28 +114,26 @@
 (defn generate-script-1
   "When this sprite clicked - toggle lesson completion"
   [lesson-num completed-lessons-id x y broadcast-rebuild-id]
-  (->> {:opcode "event_whenthisspriteclicked"
-        :topLevel true :x x :y y
-        :next {:opcode "control_if"
-               :inputs {:CONDITION
-                        {:opcode "operator_not"
-                         :inputs {:OPERAND
-                                  {:opcode "data_listcontainsitem"
-                                   :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                                   :inputs {:ITEM
-                                            {:opcode "data_variable"
-                                             :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)}}}}}}
-                        :SUBSTACK
-                        {:opcode "data_addtolist"
-                         :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                         :inputs {:ITEM
-                                  {:opcode "data_variable"
-                                   :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)}}}}}
-               :next {:opcode "event_broadcast"
-                      :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" broadcast-rebuild-id)}}}}
-       (flatten-block nil)
-       :blocks
-       (into {})))
+  (top-level-block
+   {:opcode "event_whenthisspriteclicked"
+    :topLevel true :x x :y y
+    :next {:opcode "control_if"
+           :inputs {:CONDITION
+                    {:opcode "operator_not"
+                     :inputs {:OPERAND
+                              {:opcode "data_listcontainsitem"
+                               :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
+                               :inputs {:ITEM
+                                        {:opcode "data_variable"
+                                         :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)}}}}}}
+                    :SUBSTACK
+                    {:opcode "data_addtolist"
+                     :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
+                     :inputs {:ITEM
+                              {:opcode "data_variable"
+                               :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)}}}}}
+           :next {:opcode "event_broadcast"
+                  :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" broadcast-rebuild-id)}}}}))
 
 (defn generate-script-2
   "When receiving rebuild state"
@@ -167,173 +168,117 @@
 
 (defn generate-script-3
   "When receiving add your topics"
-  [is-completed-id my-intros-id learned-topics-id broadcast-add-topics-id topic-var-id x y]
-  (let [hat-id (next-block-id)
-        if-outer-id (next-block-id)
-        equals-id (next-block-id)
-        is-completed-var-id (next-block-id)
-        repeat-id (next-block-id)
-        length-id (next-block-id)
-        set-topic-id (next-block-id)
-        item-id (next-block-id)
-        counter-id (next-block-id)
-        if-inner-id (next-block-id)
-        not-id (next-block-id)
-        contains-id (next-block-id)
-        topic-var-id2 (next-block-id)
-        add-id (next-block-id)
-        topic-var-id3 (next-block-id)]
-    {hat-id (create-block "event_whenbroadcastreceived"
-                          :next if-outer-id :topLevel true :x x :y y
-                          :fields {:BROADCAST_OPTION (variable-field "add your topics" broadcast-add-topics-id)})
-     if-outer-id (create-block "control_if"
-                               :parent hat-id
-                               :inputs {:CONDITION (block-input equals-id)
-                                        :SUBSTACK (block-input repeat-id)})
-     equals-id (create-block "operator_equals"
-                             :parent if-outer-id
-                             :inputs {:OPERAND1 (block-input is-completed-var-id)
-                                      :OPERAND2 (text-input "true")})
-     is-completed-var-id (create-block "data_variable"
-                                       :parent equals-id
-                                       :fields {:VARIABLE (variable-field "isCompleted" is-completed-id)})
-     repeat-id (create-block "control_repeat"
-                             :parent if-outer-id
-                             :inputs {:TIMES (block-input length-id)
-                                      :SUBSTACK (block-input set-topic-id)})
-     length-id (create-block "data_lengthoflist"
-                             :parent repeat-id
-                             :fields {:LIST (list-field "myIntros" my-intros-id)})
-     set-topic-id (create-block "data_setvariableto"
-                                :parent repeat-id :next if-inner-id
-                                :fields {:VARIABLE (variable-field "topic" topic-var-id)}
-                                :inputs {:VALUE (block-input item-id)})
-     item-id (create-block "data_itemoflist"
-                           :parent set-topic-id
-                           :fields {:LIST (list-field "myIntros" my-intros-id)}
-                           :inputs {:INDEX (block-input counter-id)})
-     counter-id (create-block "data_variable"
-                              :parent item-id
-                              :fields {:VARIABLE (variable-field "counter" "counter-id")})
-     if-inner-id (create-block "control_if"
-                               :parent set-topic-id
-                               :inputs {:CONDITION (block-input not-id)
-                                        :SUBSTACK (block-input add-id)})
-     not-id (create-block "operator_not"
-                          :parent if-inner-id
-                          :inputs {:OPERAND (block-input contains-id)})
-     contains-id (create-block "data_listcontainsitem"
-                               :parent not-id
-                               :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
-                               :inputs {:ITEM (block-input topic-var-id2)})
-     topic-var-id2 (create-block "data_variable"
-                                 :parent contains-id
-                                 :fields {:VARIABLE (variable-field "topic" topic-var-id)})
-     add-id (create-block "data_addtolist"
-                          :parent if-inner-id
-                          :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
-                          :inputs {:ITEM (block-input topic-var-id3)})
-     topic-var-id3 (create-block "data_variable"
-                                 :parent add-id
-                                 :fields {:VARIABLE (variable-field "topic" topic-var-id)})}))
+  [is-completed-id my-intros-id learned-topics-id broadcast-add-topics-id topic-var-id counter-var-id x y]
+  (top-level-block
+   {:opcode "event_whenbroadcastreceived"
+    :topLevel true :x x :y y
+    :fields {:BROADCAST_OPTION (variable-field "add your topics" broadcast-add-topics-id)}
+    :next {:opcode "control_if"
+           :inputs {:CONDITION
+                    {:opcode "operator_equals"
+                     :inputs {:OPERAND1
+                              {:opcode "data_variable"
+                               :fields {:VARIABLE (variable-field "isCompleted" is-completed-id)}}
+                              :OPERAND2 (text-input "true")}}
+                    :SUBSTACK
+                    {:opcode "data_setvariableto"
+                     :fields {:VARIABLE (variable-field "counter" counter-var-id)}
+                     :inputs {:VALUE (number-input 1)}
+                     :next {:opcode "control_repeat"
+                            :inputs {:TIMES
+                                     {:opcode "data_lengthoflist"
+                                      :fields {:LIST (list-field "myIntros" my-intros-id)}}
+                                     :SUBSTACK
+                                     {:opcode "data_setvariableto"
+                                      :fields {:VARIABLE (variable-field "topic" topic-var-id)}
+                                      :inputs {:VALUE
+                                               {:opcode "data_itemoflist"
+                                                :fields {:LIST (list-field "myIntros" my-intros-id)}
+                                                :inputs {:INDEX
+                                                         {:opcode "data_variable"
+                                                          :fields {:VARIABLE (variable-field "counter" counter-var-id)}}}}}
+                                      :next {:opcode "control_if"
+                                             :inputs {:CONDITION
+                                                      {:opcode "operator_not"
+                                                       :inputs {:OPERAND
+                                                                {:opcode "data_listcontainsitem"
+                                                                 :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
+                                                                 :inputs {:ITEM
+                                                                          {:opcode "data_variable"
+                                                                           :fields {:VARIABLE (variable-field "topic" topic-var-id)}}}}}}
+                                                      :SUBSTACK
+                                                      {:opcode "data_addtolist"
+                                                       :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
+                                                       :inputs {:ITEM
+                                                                {:opcode "data_variable"
+                                                                 :fields {:VARIABLE (variable-field "topic" topic-var-id)}}}}}
+                                             :next {:opcode "data_changevariableby"
+                                                    :fields {:VARIABLE (variable-field "counter" counter-var-id)}
+                                                    :inputs {:VALUE (number-input 1)}}}}}}}}}}))
 
 (defn generate-script-4
   "When receiving topics updated - show/hide based on availability"
-  [available-id my-uses-id learned-topics-id is-completed-id topic-var-id broadcast-topics-updated-id x y]
-  (let [hat-id (next-block-id)
-        set-available-true-id (next-block-id)
-        repeat-id (next-block-id)
-        length-id (next-block-id)
-        set-topic-id (next-block-id)
-        item-id (next-block-id)
-        counter-id (next-block-id)
-        if-not-contains-id (next-block-id)
-        not-id (next-block-id)
-        contains-id (next-block-id)
-        topic-var-id2 (next-block-id)
-        set-available-false-id (next-block-id)
-        if-show-hide-id (next-block-id)
-        and-id (next-block-id)
-        equals-available-id (next-block-id)
-        available-var-id (next-block-id)
-        not-completed-id (next-block-id)
-        equals-completed-id (next-block-id)
-        is-completed-var-id (next-block-id)
-        show-id (next-block-id)
-        hide-id (next-block-id)]
-    {hat-id (create-block "event_whenbroadcastreceived"
-                          :next set-available-true-id :topLevel true :x x :y y
-                          :fields {:BROADCAST_OPTION (variable-field "topics updated" broadcast-topics-updated-id)})
-     set-available-true-id (create-block "data_setvariableto"
-                                         :parent hat-id :next repeat-id
-                                         :fields {:VARIABLE (variable-field "available" available-id)}
-                                         :inputs {:VALUE (text-input "true")})
-     repeat-id (create-block "control_repeat"
-                             :parent set-available-true-id :next if-show-hide-id
-                             :inputs {:TIMES (block-input length-id)
-                                      :SUBSTACK (block-input set-topic-id)})
-     length-id (create-block "data_lengthoflist"
-                             :parent repeat-id
-                             :fields {:LIST (list-field "myUses" my-uses-id)})
-     set-topic-id (create-block "data_setvariableto"
-                                :parent repeat-id :next if-not-contains-id
-                                :fields {:VARIABLE (variable-field "topic" topic-var-id)}
-                                :inputs {:VALUE (block-input item-id)})
-     item-id (create-block "data_itemoflist"
-                           :parent set-topic-id
-                           :fields {:LIST (list-field "myUses" my-uses-id)}
-                           :inputs {:INDEX (block-input counter-id)})
-     counter-id (create-block "data_variable"
-                              :parent item-id
-                              :fields {:VARIABLE (variable-field "counter" "counter-id")})
-     if-not-contains-id (create-block "control_if"
-                                      :parent set-topic-id
-                                      :inputs {:CONDITION (block-input not-id)
-                                               :SUBSTACK (block-input set-available-false-id)})
-     not-id (create-block "operator_not"
-                          :parent if-not-contains-id
-                          :inputs {:OPERAND (block-input contains-id)})
-     contains-id (create-block "data_listcontainsitem"
-                               :parent not-id
-                               :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
-                               :inputs {:ITEM (block-input topic-var-id2)})
-     topic-var-id2 (create-block "data_variable"
-                                 :parent contains-id
-                                 :fields {:VARIABLE (variable-field "topic" topic-var-id)})
-     set-available-false-id (create-block "data_setvariableto"
-                                          :parent if-not-contains-id
-                                          :fields {:VARIABLE (variable-field "available" available-id)}
-                                          :inputs {:VALUE (text-input "false")})
-     if-show-hide-id (create-block "control_if_else"
-                                   :parent repeat-id
-                                   :inputs {:CONDITION (block-input and-id)
-                                            :SUBSTACK (block-input show-id)
-                                            :SUBSTACK2 (block-input hide-id)})
-     and-id (create-block "operator_and"
-                          :parent if-show-hide-id
-                          :inputs {:OPERAND1 (block-input equals-available-id)
-                                   :OPERAND2 (block-input not-completed-id)})
-     equals-available-id (create-block "operator_equals"
-                                       :parent and-id
-                                       :inputs {:OPERAND1 (block-input available-var-id)
-                                                :OPERAND2 (text-input "true")})
-     available-var-id (create-block "data_variable"
-                                    :parent equals-available-id
-                                    :fields {:VARIABLE (variable-field "available" available-id)})
-     not-completed-id (create-block "operator_not"
-                                    :parent and-id
-                                    :inputs {:OPERAND (block-input equals-completed-id)})
-     equals-completed-id (create-block "operator_equals"
-                                       :parent not-completed-id
-                                       :inputs {:OPERAND1 (block-input is-completed-var-id)
-                                                :OPERAND2 (text-input "true")})
-     is-completed-var-id (create-block "data_variable"
-                                       :parent equals-completed-id
-                                       :fields {:VARIABLE (variable-field "isCompleted" is-completed-id)})
-     show-id (create-block "looks_show"
-                           :parent if-show-hide-id)
-     hide-id (create-block "looks_hide"
-                           :parent if-show-hide-id)}))
+  [available-id my-uses-id learned-topics-id is-completed-id topic-var-id counter-var-id broadcast-topics-updated-id x y]
+  (top-level-block
+   {:opcode "event_whenbroadcastreceived"
+    :topLevel true :x x :y y
+    :fields {:BROADCAST_OPTION (variable-field "topics updated" broadcast-topics-updated-id)}
+    :next {:opcode "data_setvariableto"
+           :fields {:VARIABLE (variable-field "available" available-id)}
+           :inputs {:VALUE (text-input "true")}
+           :next {:opcode "data_setvariableto"
+                  :fields {:VARIABLE (variable-field "counter" counter-var-id)}
+                  :inputs {:VALUE (number-input 1)}
+                  :next {:opcode "control_repeat"
+                         :inputs {:TIMES
+                                  {:opcode "data_lengthoflist"
+                                   :fields {:LIST (list-field "myUses" my-uses-id)}}
+                                  :SUBSTACK
+                                  {:opcode "data_setvariableto"
+                                   :fields {:VARIABLE (variable-field "topic" topic-var-id)}
+                                   :inputs {:VALUE
+                                            {:opcode "data_itemoflist"
+                                             :fields {:LIST (list-field "myUses" my-uses-id)}
+                                             :inputs {:INDEX
+                                                      {:opcode "data_variable"
+                                                       :fields {:VARIABLE (variable-field "counter" counter-var-id)}}}}}
+                                   :next {:opcode "control_if"
+                                          :inputs {:CONDITION
+                                                   {:opcode "operator_not"
+                                                    :inputs {:OPERAND
+                                                             {:opcode "data_listcontainsitem"
+                                                              :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
+                                                              :inputs {:ITEM
+                                                                       {:opcode "data_variable"
+                                                                        :fields {:VARIABLE (variable-field "topic" topic-var-id)}}}}}}
+                                                   :SUBSTACK
+                                                   {:opcode "data_setvariableto"
+                                                    :fields {:VARIABLE (variable-field "available" available-id)}
+                                                    :inputs {:VALUE (text-input "false")}}}
+                                          :next {:opcode "data_changevariableby"
+                                                 :fields {:VARIABLE (variable-field "counter" counter-var-id)}
+                                                 :inputs {:VALUE (number-input 1)}}}}}
+                         :next {:opcode "control_if_else"
+                                :inputs {:CONDITION
+                                         {:opcode "operator_and"
+                                          :inputs {:OPERAND1
+                                                   {:opcode "operator_equals"
+                                                    :inputs {:OPERAND1
+                                                             {:opcode "data_variable"
+                                                              :fields {:VARIABLE (variable-field "available" available-id)}}
+                                                             :OPERAND2 (text-input "true")}}
+                                                   :OPERAND2
+                                                   {:opcode "operator_not"
+                                                    :inputs {:OPERAND
+                                                             {:opcode "operator_equals"
+                                                              :inputs {:OPERAND1
+                                                                       {:opcode "data_variable"
+                                                                        :fields {:VARIABLE (variable-field "isCompleted" is-completed-id)}}
+                                                                       :OPERAND2 (text-input "true")}}}}}}
+                                         :SUBSTACK
+                                         {:opcode "looks_show"}
+                                         :SUBSTACK2
+                                         {:opcode "looks_hide"}}}}}}}))
 
 ;; ============================================================================
 ;; Costume Generation
@@ -391,6 +336,7 @@
         my-intros-id (generate-id)
         my-uses-id (generate-id)
         topic-var-id (generate-id)
+        counter-var-id (generate-id)
 
         ;; Position
         pos (lesson-position lesson-num)
@@ -402,10 +348,10 @@
                                    (:rebuild-state broadcasts) (:add-your-topics broadcasts)
                                    (:topics-updated broadcasts) (+ 500 (:x pos)) (:y pos))
         script3 (generate-script-3 is-completed-id my-intros-id learned-topics-id
-                                   (:add-your-topics broadcasts) topic-var-id
+                                   (:add-your-topics broadcasts) topic-var-id counter-var-id
                                    (+ 1000 (:x pos)) (:y pos))
         script4 (generate-script-4 available-id my-uses-id learned-topics-id is-completed-id
-                                   topic-var-id (:topics-updated broadcasts)
+                                   topic-var-id counter-var-id (:topics-updated broadcasts)
                                    (+ 1500 (:x pos)) (:y pos))
 
         ;; Merge all blocks
@@ -420,7 +366,8 @@
               :variables {lesson-num-var-id ["lessonNumber" lesson-num]
                           is-completed-id ["isCompleted" false]
                           available-id ["available" false]
-                          topic-var-id ["topic" ""]}
+                          topic-var-id ["topic" ""]
+                          counter-var-id ["topic" 0]}
               :lists {my-intros-id ["myIntros" (vec intros)]
                       my-uses-id ["myUses" (vec uses)]}
               :broadcasts {}
