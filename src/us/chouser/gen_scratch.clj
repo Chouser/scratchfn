@@ -135,86 +135,62 @@
            :next {:opcode "event_broadcast"
                   :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" broadcast-rebuild-id)}}}}))
 
-(defn generate-script-2
-  "When receiving rebuild state"
-  [lesson-num-var-id is-completed-id completed-lessons-id 
-   broadcast-rebuild-id broadcast-add-topics-id broadcast-topics-updated-id x y]
-  (let [hat-id (next-block-id)
-        set-var-id (next-block-id)
-        contains-id (next-block-id)
-        lesson-var-id (next-block-id)
-        broadcast-wait-id (next-block-id)
-        broadcast-id (next-block-id)]
-    {hat-id (create-block "event_whenbroadcastreceived"
-                          :next set-var-id :topLevel true :x x :y y
-                          :fields {:BROADCAST_OPTION (variable-field "rebuild state" broadcast-rebuild-id)})
-     set-var-id (create-block "data_setvariableto"
-                              :parent hat-id :next broadcast-wait-id
-                              :fields {:VARIABLE (variable-field "isCompleted" is-completed-id)}
-                              :inputs {:VALUE (block-input contains-id)})
-     contains-id (create-block "data_listcontainsitem"
-                               :parent set-var-id
-                               :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                               :inputs {:ITEM (block-input lesson-var-id)})
-     lesson-var-id (create-block "data_variable"
-                                 :parent contains-id
-                                 :fields {:VARIABLE (variable-field "lessonNumber" lesson-num-var-id)})
-     broadcast-wait-id (create-block "event_broadcastandwait"
-                                     :parent set-var-id :next broadcast-id
-                                     :inputs {:BROADCAST_INPUT (broadcast-input "add your topics" broadcast-add-topics-id)})
-     broadcast-id (create-block "event_broadcast"
-                                :parent broadcast-wait-id
-                                :inputs {:BROADCAST_INPUT (broadcast-input "topics updated" broadcast-topics-updated-id)})}))
-
 (defn generate-script-3
   "When receiving add your topics"
-  [is-completed-id my-intros-id learned-topics-id broadcast-add-topics-id topic-var-id counter-var-id x y]
+  [is-completed-id my-intros-id learned-topics-id completed-lessons-id lesson-num-var-id broadcast-add-topics-id topic-var-id counter-var-id x y]
   (top-level-block
    {:opcode "event_whenbroadcastreceived"
     :topLevel true :x x :y y
     :fields {:BROADCAST_OPTION (variable-field "add your topics" broadcast-add-topics-id)}
-    :next {:opcode "control_if"
-           :inputs {:CONDITION
-                    {:opcode "operator_equals"
-                     :inputs {:OPERAND1
-                              {:opcode "data_variable"
-                               :fields {:VARIABLE (variable-field "isCompleted" is-completed-id)}}
-                              :OPERAND2 (text-input "true")}}
-                    :SUBSTACK
-                    {:opcode "data_setvariableto"
-                     :fields {:VARIABLE (variable-field "counter" counter-var-id)}
-                     :inputs {:VALUE (number-input 1)}
-                     :next {:opcode "control_repeat"
-                            :inputs {:TIMES
-                                     {:opcode "data_lengthoflist"
-                                      :fields {:LIST (list-field "myIntros" my-intros-id)}}
-                                     :SUBSTACK
-                                     {:opcode "data_setvariableto"
-                                      :fields {:VARIABLE (variable-field "topic" topic-var-id)}
-                                      :inputs {:VALUE
-                                               {:opcode "data_itemoflist"
-                                                :fields {:LIST (list-field "myIntros" my-intros-id)}
-                                                :inputs {:INDEX
-                                                         {:opcode "data_variable"
-                                                          :fields {:VARIABLE (variable-field "counter" counter-var-id)}}}}}
-                                      :next {:opcode "control_if"
-                                             :inputs {:CONDITION
-                                                      {:opcode "operator_not"
-                                                       :inputs {:OPERAND
-                                                                {:opcode "data_listcontainsitem"
-                                                                 :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
-                                                                 :inputs {:ITEM
-                                                                          {:opcode "data_variable"
-                                                                           :fields {:VARIABLE (variable-field "topic" topic-var-id)}}}}}}
-                                                      :SUBSTACK
-                                                      {:opcode "data_addtolist"
-                                                       :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
-                                                       :inputs {:ITEM
+    :next {:opcode "data_setvariableto"
+           :fields {:VARIABLE (variable-field "isCompleted" is-completed-id)}
+           :inputs {:VALUE {:opcode "data_listcontainsitem"
+                            :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
+                            :inputs {:ITEM
+                                     {:opcode "data_variable"
+                                      :fields {:VARIABLE (variable-field "lessonNumber" lesson-num-var-id)}}}}}
+           :next {:opcode "control_if"
+                  :inputs {:CONDITION
+                           {:opcode "operator_equals"
+                            :inputs {:OPERAND1
+                                     {:opcode "data_variable"
+                                      :fields {:VARIABLE (variable-field "isCompleted" is-completed-id)}}
+                                     :OPERAND2 (text-input "true")}}
+                           :SUBSTACK
+                           {:opcode "data_setvariableto"
+                            :fields {:VARIABLE (variable-field "counter" counter-var-id)}
+                            :inputs {:VALUE (number-input 1)}
+                            :next {:opcode "control_repeat"
+                                   :inputs {:TIMES
+                                            {:opcode "data_lengthoflist"
+                                             :fields {:LIST (list-field "myIntros" my-intros-id)}}
+                                            :SUBSTACK
+                                            {:opcode "data_setvariableto"
+                                             :fields {:VARIABLE (variable-field "topic" topic-var-id)}
+                                             :inputs {:VALUE
+                                                      {:opcode "data_itemoflist"
+                                                       :fields {:LIST (list-field "myIntros" my-intros-id)}
+                                                       :inputs {:INDEX
                                                                 {:opcode "data_variable"
-                                                                 :fields {:VARIABLE (variable-field "topic" topic-var-id)}}}}}
-                                             :next {:opcode "data_changevariableby"
-                                                    :fields {:VARIABLE (variable-field "counter" counter-var-id)}
-                                                    :inputs {:VALUE (number-input 1)}}}}}}}}}}))
+                                                                 :fields {:VARIABLE (variable-field "counter" counter-var-id)}}}}}
+                                             :next {:opcode "control_if"
+                                                    :inputs {:CONDITION
+                                                             {:opcode "operator_not"
+                                                              :inputs {:OPERAND
+                                                                       {:opcode "data_listcontainsitem"
+                                                                        :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
+                                                                        :inputs {:ITEM
+                                                                                 {:opcode "data_variable"
+                                                                                  :fields {:VARIABLE (variable-field "topic" topic-var-id)}}}}}}
+                                                             :SUBSTACK
+                                                             {:opcode "data_addtolist"
+                                                              :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
+                                                              :inputs {:ITEM
+                                                                       {:opcode "data_variable"
+                                                                        :fields {:VARIABLE (variable-field "topic" topic-var-id)}}}}}
+                                                    :next {:opcode "data_changevariableby"
+                                                           :fields {:VARIABLE (variable-field "counter" counter-var-id)}
+                                                           :inputs {:VALUE (number-input 1)}}}}}}}}}}}))
 
 (defn generate-script-4
   "When receiving topics updated - show/hide based on availability"
@@ -344,10 +320,7 @@
         ;; Generate all scripts
         script1 (generate-script-1 lesson-num-var-id completed-lessons-id
                                    (:x pos) (:y pos) (:rebuild-state broadcasts))
-        script2 (generate-script-2 lesson-num-var-id is-completed-id completed-lessons-id
-                                   (:rebuild-state broadcasts) (:add-your-topics broadcasts)
-                                   (:topics-updated broadcasts) (+ 500 (:x pos)) (:y pos))
-        script3 (generate-script-3 is-completed-id my-intros-id learned-topics-id
+        script3 (generate-script-3 is-completed-id my-intros-id learned-topics-id completed-lessons-id lesson-num-var-id
                                    (:add-your-topics broadcasts) topic-var-id counter-var-id
                                    (+ 1000 (:x pos)) (:y pos))
         script4 (generate-script-4 available-id my-uses-id learned-topics-id is-completed-id
@@ -355,7 +328,7 @@
                                    (+ 1500 (:x pos)) (:y pos))
 
         ;; Merge all blocks
-        all-blocks (merge script1 script2 script3 script4)
+        all-blocks (merge script1 script3 script4)
 
         ;; Generate costume
         costume-data (create-costume (generate-lesson-costume lesson-name)
@@ -427,18 +400,23 @@
 
 (defn create-stage [broadcasts learned-topics-id completed-lessons-id]
   (let [;; Initial flag script to trigger topics updated
-        hat-id (next-block-id)
-        broadcast-id (next-block-id)
-        
-        blocks {hat-id (create-block "event_whenflagclicked"
-                                     :next broadcast-id :topLevel true :x 0 :y 0)
-                broadcast-id (create-block "event_broadcast"
-                                           :parent hat-id
-                                           :inputs {:BROADCAST_INPUT (broadcast-input "topics updated" 
-                                                                                     (:topics-updated broadcasts))})}
-        
+        flagclicked (top-level-block
+                     {:opcode "event_whenflagclicked"
+                      :topLevel true :x 0 :y 0
+                      :next {:opcode "event_broadcast"
+                             :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state"
+                                                                        (:rebuild-state broadcasts))}}})
+        rebuildstate (top-level-block
+                      {:opcode "event_whenbroadcastreceived"
+                       :topLevel true :x 500 :y 0
+                       :fields {:BROADCAST_OPTION (variable-field "rebuild state" (:rebuild-state broadcasts))}
+                       :next {:opcode "event_broadcastandwait"
+                              :inputs {:BROADCAST_INPUT (broadcast-input "add your topics"
+                                                                         (:add-your-topics broadcasts))}
+                              :next {:opcode "event_broadcast"
+                                     :inputs {:BROADCAST_INPUT (broadcast-input "topics updated"
+                                                                                (:topics-updated broadcasts))}}}})
         backdrop-data (create-costume (generate-stage-backdrop) "backdrop1")]
-    
     {:stage {:isStage true
              :name "Stage"
              :variables {}
@@ -447,7 +425,7 @@
              :broadcasts {(:rebuild-state broadcasts) "rebuild state"
                           (:add-your-topics broadcasts) "add your topics"
                           (:topics-updated broadcasts) "topics updated"}
-             :blocks blocks
+             :blocks (merge flagclicked rebuildstate)
              :comments {}
              :currentCostume 0
              :costumes [(:costume backdrop-data)]
