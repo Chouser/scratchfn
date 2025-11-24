@@ -28,21 +28,6 @@
 (defn next-block-id []
   (str "block" (set! *block-counter* (inc *block-counter*))))
 
-(defn create-block
-  "Create a basic block structure"
-  [opcode & {:keys [next parent inputs fields shadow topLevel x y]
-             :or {next nil parent nil inputs {} fields {} 
-                  shadow false topLevel false x nil y nil}}]
-  (cond-> {:opcode opcode
-           :next next
-           :parent parent
-           :inputs inputs
-           :fields fields
-           :shadow shadow
-           :topLevel topLevel}
-    x (assoc :x x)
-    y (assoc :y y)))
-
 (defn text-input [value]
   "Create a text input value"
   [1 [10 value]])
@@ -99,17 +84,6 @@
 
 (defn top-level-block [op]
   (->> op (flatten-block nil) :blocks (into {})))
-
-#_(flatten-blockmap 0 {:VARIABLE (variable-field "lessonNumber" 101010)})
-#_(binding [*block-counter* 0]
-  (flatten-block nil {:opcode "data_deleteoflist"
-                  :fields {:LIST (list-field "completedLessons" 'completed-lessons-id)}
-                  :inputs {:INDEX
-                           {:opcode "data_itemnumoflist"
-                            :fields {:LIST (list-field "completedLessons" 'completed-lessons-id)}
-                            :inputs {:ITEM
-                                     {:opcode "data_variable"
-                                      :fields {:VARIABLE (variable-field "lessonNumber" 'lesson-num)}}}}}}))
 
 (defn generate-script-1
   "When this sprite clicked - toggle lesson completion"
@@ -361,19 +335,14 @@
      :assets [costume-data]}))
 
 (defn create-back-button-sprite [completed-lessons-id broadcast-rebuild-id]
-  (let [hat-id (next-block-id)
-        delete-id (next-block-id)
-        broadcast-id (next-block-id)
-        
-        blocks {hat-id (create-block "event_whenthisspriteclicked"
-                                     :next delete-id :topLevel true :x -200 :y -150)
-                delete-id (create-block "data_deleteoflist"
-                                        :parent hat-id :next broadcast-id
-                                        :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                                        :inputs {:INDEX (number-input "last")})
-                broadcast-id (create-block "event_broadcast"
-                                           :parent delete-id
-                                           :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" broadcast-rebuild-id)})}
+  (let [blocks (top-level-block
+                {:opcode "event_whenthisspriteclicked"
+                 :topLevel true :x -200 :y -150
+                 :next {:opcode "data_deleteoflist"
+                        :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
+                        :inputs {:INDEX (number-input "last")}
+                        :next {:opcode "event_broadcast"
+                               :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" broadcast-rebuild-id)}}}})
         
         costume-data (create-costume (generate-back-button-costume) "back-button")]
     
@@ -493,20 +462,3 @@
           (.closeEntry zip)))
 
       (println (str "Successfully generated " output-sb3-path)))))
-
-;; ============================================================================
-;; Example Usage
-;; ============================================================================
-
-(comment
-  ;; Example: Generate SB3 from lessons.json
-  (generate-sb3 "lessons.json" "output.sb3"))
-  
-  ;; Example input JSON structure:
-  ;; {
-  ;;   "lessons": [
-  ;;     {"lessonNumber": 1, "name": "Intro", "intro": ["basics"], "uses": []},
-  ;;     {"lessonNumber": 2, "name": "Advanced", "intro": ["loops"], "uses": ["basics"]}
-  ;;   ]
-  ;; }
-  
