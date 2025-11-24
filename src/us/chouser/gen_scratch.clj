@@ -23,10 +23,10 @@
 ;; Block Generation Helpers
 ;; ============================================================================
 
-(def block-counter (atom 0))
+(def ^:dynamic *block-counter*)
 
 (defn next-block-id []
-  (str "block" (swap! block-counter inc)))
+  (str "block" (set! *block-counter* (inc *block-counter*))))
 
 (defn create-block
   "Create a basic block structure"
@@ -71,54 +71,68 @@
 ;; Script Generation for Lesson Sprites
 ;; ============================================================================
 
+(declare flatten-block)
+
+(defn flatten-blockmap [parent-id blockmap]
+  (let [flats (map (partial flatten-block parent-id) (vals blockmap))]
+    {:map (zipmap (keys blockmap) (map :top flats))
+     :blocks (mapcat :blocks flats)}))
+
+;; return a seq of [id node], where the first in the sequence is the "top"
+(defn flatten-block
+  [parent-id block]
+  (if-not (map? block)
+    {:top block}
+    (let [id (next-block-id)
+          fields (->> block :fields (flatten-blockmap id))
+          inputs (->> block :inputs (flatten-blockmap id))
+          next-flat (->> block :next (flatten-block parent-id))]
+      {:top (block-input id)
+       :blocks (into [[id (merge {:shadow false
+                                  :topLevel false}
+                                 block
+                                 {:parent parent-id
+                                  :inputs (:map inputs)
+                                  :fields (:map fields)
+                                  :next (second (:top next-flat))})]]
+                     (mapcat :blocks [fields inputs next-flat]))})))
+
+#_(flatten-blockmap 0 {:VARIABLE (variable-field "lessonNumber" 101010)})
+#_(binding [*block-counter* 0]
+  (flatten-block nil {:opcode "data_deleteoflist"
+                  :fields {:LIST (list-field "completedLessons" 'completed-lessons-id)}
+                  :inputs {:INDEX
+                           {:opcode "data_itemnumoflist"
+                            :fields {:LIST (list-field "completedLessons" 'completed-lessons-id)}
+                            :inputs {:ITEM
+                                     {:opcode "data_variable"
+                                      :fields {:VARIABLE (variable-field "lessonNumber" 'lesson-num)}}}}}}))
+
 (defn generate-script-1
   "When this sprite clicked - toggle lesson completion"
   [lesson-num completed-lessons-id x y broadcast-rebuild-id]
-  (let [hat-id (next-block-id)
-        if-id (next-block-id)
-        contains-id (next-block-id)
-        lesson-var-id (next-block-id)
-        delete-id (next-block-id)
-        position-id (next-block-id)
-        lesson-var-id2 (next-block-id)
-        add-id (next-block-id)
-        lesson-var-id3 (next-block-id)
-        broadcast-id (next-block-id)]
-    {hat-id (create-block "event_whenthisspriteclicked"
-                          :next if-id :topLevel true :x x :y y)
-     if-id (create-block "control_if_else"
-                         :parent hat-id :next broadcast-id
-                         :inputs {:CONDITION (block-input contains-id)
-                                  :SUBSTACK (block-input delete-id)
-                                  :SUBSTACK2 (block-input add-id)})
-     contains-id (create-block "data_listcontainsitem"
-                               :parent if-id
-                               :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                               :inputs {:ITEM (block-input lesson-var-id)})
-     lesson-var-id (create-block "data_variable"
-                                 :parent contains-id
-                                 :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)})
-     delete-id (create-block "data_deleteoflist"
-                             :parent if-id
-                             :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                             :inputs {:INDEX (block-input position-id)})
-     position-id (create-block "data_itemnumoflist"
-                               :parent delete-id
-                               :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                               :inputs {:ITEM (block-input lesson-var-id2)})
-     lesson-var-id2 (create-block "data_variable"
-                                  :parent position-id
-                                  :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)})
-     add-id (create-block "data_addtolist"
-                          :parent if-id
-                          :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                          :inputs {:ITEM (block-input lesson-var-id3)})
-     lesson-var-id3 (create-block "data_variable"
-                                  :parent add-id
-                                  :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)})
-     broadcast-id (create-block "event_broadcast"
-                                :parent hat-id
-                                :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" broadcast-rebuild-id)})}))
+  (->> {:opcode "event_whenthisspriteclicked"
+        :topLevel true :x x :y y
+        :next {:opcode "control_if"
+               :inputs {:CONDITION
+                        {:opcode "operator_not"
+                         :inputs {:OPERAND
+                                  {:opcode "data_listcontainsitem"
+                                   :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
+                                   :inputs {:ITEM
+                                            {:opcode "data_variable"
+                                             :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)}}}}}}
+                        :SUBSTACK
+                        {:opcode "data_addtolist"
+                         :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
+                         :inputs {:ITEM
+                                  {:opcode "data_variable"
+                                   :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)}}}}}
+               :next {:opcode "event_broadcast"
+                      :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" broadcast-rebuild-id)}}}}
+       (flatten-block nil)
+       :blocks
+       (into {})))
 
 (defn generate-script-2
   "When receiving rebuild state"
@@ -367,7 +381,7 @@
 (defn create-lesson-sprite [lesson broadcasts learned-topics-id completed-lessons-id]
   (let [lesson-num (:lessonNumber lesson)
         lesson-name (:name lesson)
-        intros (:intro lesson)
+        intros (:intros lesson)
         uses (:uses lesson)
 
         ;; Generate IDs
@@ -386,13 +400,13 @@
                                    (:x pos) (:y pos) (:rebuild-state broadcasts))
         script2 (generate-script-2 lesson-num-var-id is-completed-id completed-lessons-id
                                    (:rebuild-state broadcasts) (:add-your-topics broadcasts)
-                                   (:topics-updated broadcasts) (:x pos) (- (:y pos) 100))
+                                   (:topics-updated broadcasts) (+ 500 (:x pos)) (:y pos))
         script3 (generate-script-3 is-completed-id my-intros-id learned-topics-id
                                    (:add-your-topics broadcasts) topic-var-id
-                                   (:x pos) (- (:y pos) 200))
+                                   (+ 1000 (:x pos)) (:y pos))
         script4 (generate-script-4 available-id my-uses-id learned-topics-id is-completed-id
                                    topic-var-id (:topics-updated broadcasts)
-                                   (:x pos) (- (:y pos) 300))
+                                   (+ 1500 (:x pos)) (:y pos))
 
         ;; Merge all blocks
         all-blocks (merge script1 script2 script3 script4)
@@ -402,7 +416,7 @@
                                      (str "lesson" lesson-num))]
 
     {:sprite {:isStage false
-              :name (str "Lesson" lesson-num)
+              :name (str "L " lesson-name)
               :variables {lesson-num-var-id ["lessonNumber" lesson-num]
                           is-completed-id ["isCompleted" false]
                           available-id ["available" false]
@@ -504,54 +518,54 @@
 ;; ============================================================================
 
 (defn generate-sb3 [lessons output-sb3-path]
-  (reset! block-counter 0)
+  (binding [*block-counter* 0]
 
-  ;; Read and parse JSON
-  (let [;; Generate shared IDs
-        learned-topics-id (generate-id)
-        completed-lessons-id (generate-id)
-        broadcasts {:rebuild-state (generate-id)
-                    :add-your-topics (generate-id)
-                    :topics-updated (generate-id)}
+    ;; Read and parse JSON
+    (let [;; Generate shared IDs
+          learned-topics-id (generate-id)
+          completed-lessons-id (generate-id)
+          broadcasts {:rebuild-state (generate-id)
+                      :add-your-topics (generate-id)
+                      :topics-updated (generate-id)}
 
-        ;; Create stage
-        stage-data (create-stage broadcasts learned-topics-id completed-lessons-id)
+          ;; Create stage
+          stage-data (create-stage broadcasts learned-topics-id completed-lessons-id)
 
-        ;; Create back button
-        back-button-data (create-back-button-sprite completed-lessons-id (:rebuild-state broadcasts))
+          ;; Create back button
+          back-button-data (create-back-button-sprite completed-lessons-id (:rebuild-state broadcasts))
 
-        ;; Create lesson sprites
-        lesson-sprites (map #(create-lesson-sprite % broadcasts learned-topics-id completed-lessons-id)
-                            lessons)
+          ;; Create lesson sprites
+          lesson-sprites (map #(create-lesson-sprite % broadcasts learned-topics-id completed-lessons-id)
+                              lessons)
 
-        ;; Collect all targets and assets
-        all-targets (concat [(:stage stage-data) (:sprite back-button-data)]
-                            (map :sprite lesson-sprites))
-        all-assets (concat (:assets stage-data) (:assets back-button-data)
-                           (mapcat :assets lesson-sprites))
+          ;; Collect all targets and assets
+          all-targets (concat [(:stage stage-data) (:sprite back-button-data)]
+                              (map :sprite lesson-sprites))
+          all-assets (concat (:assets stage-data) (:assets back-button-data)
+                             (mapcat :assets lesson-sprites))
 
-        ;; Create project structure
-        project {:targets (vec all-targets)
-                 :monitors []
-                 :extensions []
-                 :meta {:semver "3.0.0"
-                        :vm "0.2.0"
-                        :agent ""}}]
+          ;; Create project structure
+          project {:targets (vec all-targets)
+                   :monitors []
+                   :extensions []
+                   :meta {:semver "3.0.0"
+                          :vm "0.2.0"
+                          :agent ""}}]
 
-    ;; Write ZIP file
-    (with-open [zip (ZipOutputStream. (FileOutputStream. output-sb3-path))]
-      ;; Add project.json
-      (.putNextEntry zip (ZipEntry. "project.json"))
-      (.write zip (.getBytes (json/write-str project) "UTF-8"))
-      (.closeEntry zip)
+      ;; Write ZIP file
+      (with-open [zip (ZipOutputStream. (FileOutputStream. output-sb3-path))]
+        ;; Add project.json
+        (.putNextEntry zip (ZipEntry. "project.json"))
+        (.write zip (.getBytes (json/write-str project) "UTF-8"))
+        (.closeEntry zip)
 
-      ;; Add asset files
-      (doseq [asset all-assets]
-        (.putNextEntry zip (ZipEntry. (:file-name asset)))
-        (.write zip (.getBytes (:content asset) "UTF-8"))
-        (.closeEntry zip)))
+        ;; Add asset files
+        (doseq [asset all-assets]
+          (.putNextEntry zip (ZipEntry. (:file-name asset)))
+          (.write zip (.getBytes (:content asset) "UTF-8"))
+          (.closeEntry zip)))
 
-    (println (str "Successfully generated " output-sb3-path))))
+      (println (str "Successfully generated " output-sb3-path)))))
 
 ;; ============================================================================
 ;; Example Usage
@@ -559,7 +573,7 @@
 
 (comment
   ;; Example: Generate SB3 from lessons.json
-  (generate-sb3 "lessons.json" "output.sb3")
+  (generate-sb3 "lessons.json" "output.sb3"))
   
   ;; Example input JSON structure:
   ;; {
@@ -568,4 +582,4 @@
   ;;     {"lessonNumber": 2, "name": "Advanced", "intro": ["loops"], "uses": ["basics"]}
   ;;   ]
   ;; }
-  )
+  
