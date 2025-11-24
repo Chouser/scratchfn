@@ -410,12 +410,14 @@
                       {:opcode "event_whenbroadcastreceived"
                        :topLevel true :x 500 :y 0
                        :fields {:BROADCAST_OPTION (variable-field "rebuild state" (:rebuild-state broadcasts))}
-                       :next {:opcode "event_broadcastandwait"
-                              :inputs {:BROADCAST_INPUT (broadcast-input "add your topics"
-                                                                         (:add-your-topics broadcasts))}
-                              :next {:opcode "event_broadcast"
-                                     :inputs {:BROADCAST_INPUT (broadcast-input "topics updated"
-                                                                                (:topics-updated broadcasts))}}}})
+                       :next {:opcode "data_deletealloflist"
+                              :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
+                              :next {:opcode "event_broadcastandwait"
+                                     :inputs {:BROADCAST_INPUT (broadcast-input "add your topics"
+                                                                                (:add-your-topics broadcasts))}
+                                     :next {:opcode "event_broadcast"
+                                            :inputs {:BROADCAST_INPUT (broadcast-input "topics updated"
+                                                                                       (:topics-updated broadcasts))}}}}})
         backdrop-data (create-costume (generate-stage-backdrop) "backdrop1")]
     {:stage {:isStage true
              :name "Stage"
