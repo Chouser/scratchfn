@@ -87,7 +87,7 @@
 
 (defn generate-script-1
   "When this sprite clicked - toggle lesson completion"
-  [lesson-num completed-lessons-id x y broadcast-rebuild-id]
+  [{:keys [completed-lessons-id lesson-num rebuild-state-id]} x y]
   (top-level-block
    {:opcode "event_whenthisspriteclicked"
     :topLevel true :x x :y y
@@ -97,32 +97,26 @@
                      :inputs {:OPERAND
                               {:opcode "data_listcontainsitem"
                                :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                               :inputs {:ITEM
-                                        {:opcode "data_variable"
-                                         :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)}}}}}}
+                               :inputs {:ITEM (number-input lesson-num)}}}}
                     :SUBSTACK
                     {:opcode "data_addtolist"
                      :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                     :inputs {:ITEM
-                              {:opcode "data_variable"
-                               :fields {:VARIABLE (variable-field "lessonNumber" lesson-num)}}}}}
+                     :inputs {:ITEM (number-input lesson-num)}}}
            :next {:opcode "event_broadcast"
-                  :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" broadcast-rebuild-id)}}}}))
+                  :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" rebuild-state-id)}}}}))
 
 (defn generate-script-3
   "When receiving add your topics"
-  [is-completed-id my-intros-id learned-topics-id completed-lessons-id lesson-num-var-id broadcast-add-topics-id topic-var-id counter-var-id x y]
+  [{:keys [learned-topics-id completed-lessons-id is-completed-id my-intros-id lesson-num add-topics-id topic-var-id counter-var-id ] :as ctx} x y]
   (top-level-block
    {:opcode "event_whenbroadcastreceived"
     :topLevel true :x x :y y
-    :fields {:BROADCAST_OPTION (variable-field "add your topics" broadcast-add-topics-id)}
+    :fields {:BROADCAST_OPTION (variable-field "add your topics" add-topics-id)}
     :next {:opcode "data_setvariableto"
            :fields {:VARIABLE (variable-field "isCompleted" is-completed-id)}
            :inputs {:VALUE {:opcode "data_listcontainsitem"
                             :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
-                            :inputs {:ITEM
-                                     {:opcode "data_variable"
-                                      :fields {:VARIABLE (variable-field "lessonNumber" lesson-num-var-id)}}}}}
+                            :inputs {:ITEM (number-input lesson-num)}}}
            :next {:opcode "control_if"
                   :inputs {:CONDITION
                            {:opcode "operator_equals"
@@ -168,11 +162,11 @@
 
 (defn generate-script-4
   "When receiving topics updated - show/hide based on availability"
-  [available-id my-uses-id learned-topics-id is-completed-id topic-var-id counter-var-id broadcast-topics-updated-id x y]
+  [{:keys [learned-topics-id available-id my-uses-id is-completed-id topic-var-id counter-var-id topics-updated-id] :as ctx} x y]
   (top-level-block
    {:opcode "event_whenbroadcastreceived"
     :topLevel true :x x :y y
-    :fields {:BROADCAST_OPTION (variable-field "topics updated" broadcast-topics-updated-id)}
+    :fields {:BROADCAST_OPTION (variable-field "topics updated" topics-updated-id)}
     :next {:opcode "data_setvariableto"
            :fields {:VARIABLE (variable-field "available" available-id)}
            :inputs {:VALUE (text-input "true")}
@@ -273,50 +267,38 @@
     {:x (- (* col 100) 250)
      :y (- 150 (* row 80))}))
 
-(defn create-lesson-sprite [lesson broadcasts learned-topics-id completed-lessons-id]
+(defn create-lesson-sprite [ctx lesson]
   (let [lesson-num (:lessonNumber lesson)
-        lesson-name (:name lesson)
-        intros (:intros lesson)
-        uses (:uses lesson)
 
         ;; Generate IDs
-        lesson-num-var-id (generate-id)
-        is-completed-id (generate-id)
-        available-id (generate-id)
-        my-intros-id (generate-id)
-        my-uses-id (generate-id)
-        topic-var-id (generate-id)
-        counter-var-id (generate-id)
+        {:keys [is-completed-id
+                available-id
+                topic-var-id
+                counter-var-id
+                my-intros-id
+                my-uses-id] :as ctx}
+        , (merge ctx {:lesson-num lesson-num
+                      :is-completed-id (generate-id)
+                      :available-id (generate-id)
+                      :my-intros-id (generate-id)
+                      :my-uses-id (generate-id)
+                      :topic-var-id (generate-id)
+                      :counter-var-id (generate-id)})
 
-        ;; Position
         pos (lesson-position lesson-num)
+        all-blocks (merge (generate-script-1 ctx (:x pos) (:y pos))
+                          (generate-script-3 ctx (+ 1000 (:x pos)) (:y pos))
+                          (generate-script-4 ctx (+ 1500 (:x pos)) (:y pos)))
+        costume-data (create-costume (generate-lesson-costume (:name lesson)) (:name lesson))]
 
-        ;; Generate all scripts
-        script1 (generate-script-1 lesson-num-var-id completed-lessons-id
-                                   (:x pos) (:y pos) (:rebuild-state broadcasts))
-        script3 (generate-script-3 is-completed-id my-intros-id learned-topics-id completed-lessons-id lesson-num-var-id
-                                   (:add-your-topics broadcasts) topic-var-id counter-var-id
-                                   (+ 1000 (:x pos)) (:y pos))
-        script4 (generate-script-4 available-id my-uses-id learned-topics-id is-completed-id
-                                   topic-var-id counter-var-id (:topics-updated broadcasts)
-                                   (+ 1500 (:x pos)) (:y pos))
-
-        ;; Merge all blocks
-        all-blocks (merge script1 script3 script4)
-
-        ;; Generate costume
-        costume-data (create-costume (generate-lesson-costume lesson-name)
-                                     (str "lesson" lesson-num))]
-
-    {:sprite {:isStage false
-              :name (str "L " lesson-name)
-              :variables {lesson-num-var-id ["lessonNumber" lesson-num]
-                          is-completed-id ["isCompleted" false]
+    {:target {:isStage false
+              :name (:name lesson)
+              :variables {is-completed-id ["isCompleted" false]
                           available-id ["available" false]
                           topic-var-id ["topic" ""]
                           counter-var-id ["topic" 0]}
-              :lists {my-intros-id ["myIntros" (vec intros)]
-                      my-uses-id ["myUses" (vec uses)]}
+              :lists {my-intros-id ["myIntros" (:intros lesson)]
+                      my-uses-id ["myUses" (:uses lesson)]}
               :broadcasts {}
               :blocks all-blocks
               :comments {}
@@ -334,7 +316,7 @@
               :rotationStyle "all around"}
      :assets [costume-data]}))
 
-(defn create-back-button-sprite [completed-lessons-id broadcast-rebuild-id]
+(defn create-back-button-sprite [{:keys [completed-lessons-id rebuild-state-id]}]
   (let [blocks (top-level-block
                 {:opcode "event_whenthisspriteclicked"
                  :topLevel true :x -200 :y -150
@@ -342,11 +324,11 @@
                         :fields {:LIST (list-field "completedLessons" completed-lessons-id)}
                         :inputs {:INDEX (number-input "last")}
                         :next {:opcode "event_broadcast"
-                               :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" broadcast-rebuild-id)}}}})
-        
+                               :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" rebuild-state-id)}}}})
+
         costume-data (create-costume (generate-back-button-costume) "back-button")]
-    
-    {:sprite {:isStage false
+
+    {:target {:isStage false
               :name "BackButton"
               :variables {}
               :lists {}
@@ -367,46 +349,45 @@
               :rotationStyle "all around"}
      :assets [costume-data]}))
 
-(defn create-stage [broadcasts learned-topics-id completed-lessons-id]
+(defn create-stage [{:keys [learned-topics-id completed-lessons-id rebuild-state-id add-your-topics-id topics-updated-id] :as ctx}]
   (let [;; Initial flag script to trigger topics updated
         flagclicked (top-level-block
                      {:opcode "event_whenflagclicked"
                       :topLevel true :x 0 :y 0
                       :next {:opcode "event_broadcast"
-                             :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state"
-                                                                        (:rebuild-state broadcasts))}}})
+                             :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" rebuild-state-id)}}})
         rebuildstate (top-level-block
                       {:opcode "event_whenbroadcastreceived"
                        :topLevel true :x 500 :y 0
-                       :fields {:BROADCAST_OPTION (variable-field "rebuild state" (:rebuild-state broadcasts))}
+                       :fields {:BROADCAST_OPTION (variable-field "rebuild state" rebuild-state-id)}
                        :next {:opcode "data_deletealloflist"
                               :fields {:LIST (list-field "learnedTopics" learned-topics-id)}
                               :next {:opcode "event_broadcastandwait"
                                      :inputs {:BROADCAST_INPUT (broadcast-input "add your topics"
-                                                                                (:add-your-topics broadcasts))}
+                                                                                add-your-topics-id)}
                                      :next {:opcode "event_broadcast"
                                             :inputs {:BROADCAST_INPUT (broadcast-input "topics updated"
-                                                                                       (:topics-updated broadcasts))}}}}})
+                                                                                       topics-updated-id)}}}}})
         backdrop-data (create-costume (generate-stage-backdrop) "backdrop1")]
-    {:stage {:isStage true
-             :name "Stage"
-             :variables {}
-             :lists {learned-topics-id ["learnedTopics" []]
-                     completed-lessons-id ["completedLessons" []]}
-             :broadcasts {(:rebuild-state broadcasts) "rebuild state"
-                          (:add-your-topics broadcasts) "add your topics"
-                          (:topics-updated broadcasts) "topics updated"}
-             :blocks (merge flagclicked rebuildstate)
-             :comments {}
-             :currentCostume 0
-             :costumes [(:costume backdrop-data)]
-             :sounds []
-             :volume 100
-             :layerOrder 0
-             :tempo 60
-             :videoTransparency 50
-             :videoState "off"
-             :textToSpeechLanguage nil}
+    {:target {:isStage true
+              :name "Stage"
+              :variables {}
+              :lists {learned-topics-id ["learnedTopics" []]
+                      completed-lessons-id ["completedLessons" []]}
+              :broadcasts {rebuild-state-id "rebuild state"
+                           add-your-topics-id "add your topics"
+                           topics-updated-id "topics updated"}
+              :blocks (merge flagclicked rebuildstate)
+              :comments {}
+              :currentCostume 0
+              :costumes [(:costume backdrop-data)]
+              :sounds []
+              :volume 100
+              :layerOrder 0
+              :tempo 60
+              :videoTransparency 50
+              :videoState "off"
+              :textToSpeechLanguage nil}
      :assets [backdrop-data]}))
 
 ;; ============================================================================
@@ -415,33 +396,18 @@
 
 (defn generate-sb3 [lessons output-sb3-path]
   (binding [*block-counter* 0]
+    (let [ctx {:learned-topics-id (generate-id)
+               :completed-lessons-id (generate-id)
+               :rebuild-state-id (generate-id)
+               :add-your-topics-id (generate-id)
+               :topics-updated-id (generate-id)}
 
-    ;; Read and parse JSON
-    (let [;; Generate shared IDs
-          learned-topics-id (generate-id)
-          completed-lessons-id (generate-id)
-          broadcasts {:rebuild-state (generate-id)
-                      :add-your-topics (generate-id)
-                      :topics-updated (generate-id)}
-
-          ;; Create stage
-          stage-data (create-stage broadcasts learned-topics-id completed-lessons-id)
-
-          ;; Create back button
-          back-button-data (create-back-button-sprite completed-lessons-id (:rebuild-state broadcasts))
-
-          ;; Create lesson sprites
-          lesson-sprites (map #(create-lesson-sprite % broadcasts learned-topics-id completed-lessons-id)
-                              lessons)
-
-          ;; Collect all targets and assets
-          all-targets (concat [(:stage stage-data) (:sprite back-button-data)]
-                              (map :sprite lesson-sprites))
-          all-assets (concat (:assets stage-data) (:assets back-button-data)
-                             (mapcat :assets lesson-sprites))
+          builds (-> [(create-stage ctx)
+                      (create-back-button-sprite ctx)]
+                     (into (map #(create-lesson-sprite ctx %) lessons)))
 
           ;; Create project structure
-          project {:targets (vec all-targets)
+          project {:targets (mapv :target builds)
                    :monitors []
                    :extensions []
                    :meta {:semver "3.0.0"
@@ -456,7 +422,7 @@
         (.closeEntry zip)
 
         ;; Add asset files
-        (doseq [asset all-assets]
+        (doseq [asset (mapcat :assets builds)]
           (.putNextEntry zip (ZipEntry. (:file-name asset)))
           (.write zip (.getBytes (:content asset) "UTF-8"))
           (.closeEntry zip)))
