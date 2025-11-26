@@ -90,15 +90,16 @@
 
 ;; TODO broadcast items in the context are sometimes used as broadcast-input and sometimes as variable-field
 (defn make-broadcasts [ks]
-  (let [ids (repeatedly (count ks) generate-id)]
-    {:broadcasts (zipmap ids ks)
-     :ctx (into {} (map (fn [b-name id]
-                          [b-name [1 [11 b-name id]]])
-                        ks ids))}))
+  (->> (map (fn [k id]
+              [k {:broadcast [id k]
+                  :as-input [1 [11 k id]]
+                  :as-variable [k id]}])
+            ks (repeatedly generate-id))
+       (into {})))
 
 (defn generate-script-1
   "When this sprite clicked - toggle lesson completion"
-  [{:keys [completed-lessons lesson-num rebuild-state-id]} x y]
+  [{:keys [completed-lessons lesson-num rebuild-state]} x y]
   (top-level-block
    {:opcode "event_whenthisspriteclicked"
     :topLevel true :x x :y y
@@ -114,15 +115,15 @@
                      :fields {:LIST completed-lessons}
                      :inputs {:ITEM (number-input lesson-num)}}}
            :next {:opcode "event_broadcast"
-                  :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" rebuild-state-id)}}}}))
+                  :inputs {:BROADCAST_INPUT (:as-input rebuild-state)}}}}))
 
 (defn generate-script-3
   "When receiving add your topics"
-  [{:keys [learned-topics completed-lessons is-completed my-intros lesson-num add-topics-id topic counter] :as ctx} x y]
+  [{:keys [learned-topics completed-lessons is-completed my-intros lesson-num add-your-topics topic counter] :as ctx} x y]
   (top-level-block
    {:opcode "event_whenbroadcastreceived"
     :topLevel true :x x :y y
-    :fields {:BROADCAST_OPTION (variable-field "add your topics" add-topics-id)}
+    :fields {:BROADCAST_OPTION (:as-variable add-your-topics)}
     :next {:opcode "data_setvariableto"
            :fields {:VARIABLE is-completed}
            :inputs {:VALUE {:opcode "data_listcontainsitem"
@@ -173,11 +174,11 @@
 
 (defn generate-script-4
   "When receiving topics updated - show/hide based on availability"
-  [{:keys [learned-topics available my-uses is-completed topic counter topics-updated-id] :as ctx} x y]
+  [{:keys [learned-topics available my-uses is-completed topic counter topics-updated] :as ctx} x y]
   (top-level-block
    {:opcode "event_whenbroadcastreceived"
     :topLevel true :x x :y y
-    :fields {:BROADCAST_OPTION (variable-field "topics updated" topics-updated-id)}
+    :fields {:BROADCAST_OPTION (:as-variable topics-updated)}
     :next {:opcode "data_setvariableto"
            :fields {:VARIABLE available}
            :inputs {:VALUE (text-input "true")}
@@ -319,7 +320,7 @@
               :rotationStyle "all around"}
      :assets [costume-data]}))
 
-(defn create-back-button-sprite [{:keys [completed-lessons rebuild-state-id]}]
+(defn create-back-button-sprite [{:keys [completed-lessons rebuild-state]}]
   (let [blocks (top-level-block
                 {:opcode "event_whenthisspriteclicked"
                  :topLevel true :x -200 :y -150
@@ -327,7 +328,7 @@
                         :fields {:LIST completed-lessons}
                         :inputs {:INDEX (number-input "last")}
                         :next {:opcode "event_broadcast"
-                               :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" rebuild-state-id)}}}})
+                               :inputs {:BROADCAST_INPUT (:as-input rebuild-state)}}}})
 
         costume-data (create-costume (generate-back-button-costume) "back-button")]
 
@@ -352,34 +353,30 @@
               :rotationStyle "all around"}
      :assets [costume-data]}))
 
-(defn create-stage [{:keys [learned-topics rebuild-state-id add-your-topics-id topics-updated-id] :as ctx}
+(defn create-stage [{:keys [learned-topics rebuild-state add-your-topics topics-updated] :as ctx}
                     stage-lists]
   (let [;; Initial flag script to trigger topics updated
         flagclicked (top-level-block
                      {:opcode "event_whenflagclicked"
                       :topLevel true :x 0 :y 0
                       :next {:opcode "event_broadcast"
-                             :inputs {:BROADCAST_INPUT (broadcast-input "rebuild state" rebuild-state-id)}}})
+                             :inputs {:BROADCAST_INPUT (:as-input rebuild-state)}}})
         rebuildstate (top-level-block
                       {:opcode "event_whenbroadcastreceived"
                        :topLevel true :x 500 :y 0
-                       :fields {:BROADCAST_OPTION (variable-field "rebuild state" rebuild-state-id)}
+                       :fields {:BROADCAST_OPTION (:as-variable rebuild-state)}
                        :next {:opcode "data_deletealloflist"
                               :fields {:LIST learned-topics}
                               :next {:opcode "event_broadcastandwait"
-                                     :inputs {:BROADCAST_INPUT (broadcast-input "add your topics"
-                                                                                add-your-topics-id)}
+                                     :inputs {:BROADCAST_INPUT (:as-input add-your-topics)}
                                      :next {:opcode "event_broadcast"
-                                            :inputs {:BROADCAST_INPUT (broadcast-input "topics updated"
-                                                                                       topics-updated-id)}}}}})
+                                            :inputs {:BROADCAST_INPUT (:as-input topics-updated)}}}}})
         backdrop-data (create-costume (generate-stage-backdrop) "backdrop1")]
     {:target {:isStage true
               :name "Stage"
               :variables {}
               :lists (:variables stage-lists)
-              :broadcasts {rebuild-state-id "rebuild state"
-                           add-your-topics-id "add your topics"
-                           topics-updated-id "topics updated"}
+              :broadcasts (into {} (keep :broadcast) (vals ctx))
               :blocks (merge flagclicked rebuildstate)
               :comments {}
               :currentCostume 0
@@ -402,9 +399,7 @@
     (let [stage-lists (make-variables {:learned-topics []
                                        :completed-lessons []})
           ctx (merge (:ctx stage-lists)
-                     {:rebuild-state-id (generate-id)
-                      :add-your-topics-id (generate-id)
-                      :topics-updated-id (generate-id)})
+                     (make-broadcasts [:rebuild-state :add-your-topics :topics-updated]))
 
           builds (-> [(create-stage ctx stage-lists)
                       (create-back-button-sprite ctx)]
