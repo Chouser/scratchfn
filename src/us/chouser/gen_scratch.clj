@@ -82,13 +82,26 @@
   (->> op (flatten-block nil) :blocks (into {})))
 
 (defn make-variables [m]
-  (let [ids (repeatedly (count m) generate-id)]
-    {:variables (zipmap ids m)
-     :ctx (into {} (map (fn [[var-name _] id]
-                          [var-name [var-name id]])
-                        m ids))}))
+  (->> (map (fn [[k init] id]
+              [k {:variable [id [k init]]
+                  :as-variable [k id]}])
+            m (repeatedly generate-id))
+       (into {})))
 
-;; TODO broadcast items in the context are sometimes used as broadcast-input and sometimes as variable-field
+(defn make-lists [m]
+  (->> (map (fn [[k init] id]
+              [k {:list [id [k init]]
+                  :as-list [k id]}])
+            m (repeatedly generate-id))
+       (into {})))
+
+(defn make-stage-lists [m]
+  (->> (map (fn [[k init] id]
+              [k {:stage-list [id [k init]]
+                  :as-list [k id]}])
+            m (repeatedly generate-id))
+       (into {})))
+
 (defn make-broadcasts [ks]
   (->> (map (fn [k id]
               [k {:broadcast [id k]
@@ -108,11 +121,11 @@
                     {:opcode "operator_not"
                      :inputs {:OPERAND
                               {:opcode "data_listcontainsitem"
-                               :fields {:LIST completed-lessons}
+                               :fields {:LIST (:as-list completed-lessons)}
                                :inputs {:ITEM (number-input lesson-num)}}}}
                     :SUBSTACK
                     {:opcode "data_addtolist"
-                     :fields {:LIST completed-lessons}
+                     :fields {:LIST (:as-list completed-lessons)}
                      :inputs {:ITEM (number-input lesson-num)}}}
            :next {:opcode "event_broadcast"
                   :inputs {:BROADCAST_INPUT (:as-input rebuild-state)}}}}))
@@ -125,51 +138,51 @@
     :topLevel true :x x :y y
     :fields {:BROADCAST_OPTION (:as-variable add-your-topics)}
     :next {:opcode "data_setvariableto"
-           :fields {:VARIABLE is-completed}
+           :fields {:VARIABLE (:as-variable is-completed)}
            :inputs {:VALUE {:opcode "data_listcontainsitem"
-                            :fields {:LIST completed-lessons}
+                            :fields {:LIST (:as-list completed-lessons)}
                             :inputs {:ITEM (number-input lesson-num)}}}
            :next {:opcode "control_if"
                   :inputs {:CONDITION
                            {:opcode "operator_equals"
                             :inputs {:OPERAND1
                                      {:opcode "data_variable"
-                                      :fields {:VARIABLE is-completed}}
+                                      :fields {:VARIABLE (:as-variable is-completed)}}
                                      :OPERAND2 (text-input "true")}}
                            :SUBSTACK
                            {:opcode "data_setvariableto"
-                            :fields {:VARIABLE counter}
+                            :fields {:VARIABLE (:as-variable counter)}
                             :inputs {:VALUE (number-input 1)}
                             :next {:opcode "control_repeat"
                                    :inputs {:TIMES
                                             {:opcode "data_lengthoflist"
-                                             :fields {:LIST my-intros}}
+                                             :fields {:LIST (:as-list my-intros)}}
                                             :SUBSTACK
                                             {:opcode "data_setvariableto"
-                                             :fields {:VARIABLE topic}
+                                             :fields {:VARIABLE (:as-variable topic)}
                                              :inputs {:VALUE
                                                       {:opcode "data_itemoflist"
-                                                       :fields {:LIST my-intros}
+                                                       :fields {:LIST (:as-list my-intros)}
                                                        :inputs {:INDEX
                                                                 {:opcode "data_variable"
-                                                                 :fields {:VARIABLE counter}}}}}
+                                                                 :fields {:VARIABLE (:as-variable counter)}}}}}
                                              :next {:opcode "control_if"
                                                     :inputs {:CONDITION
                                                              {:opcode "operator_not"
                                                               :inputs {:OPERAND
                                                                        {:opcode "data_listcontainsitem"
-                                                                        :fields {:LIST learned-topics}
+                                                                        :fields {:LIST (:as-list learned-topics)}
                                                                         :inputs {:ITEM
                                                                                  {:opcode "data_variable"
-                                                                                  :fields {:VARIABLE topic}}}}}}
+                                                                                  :fields {:VARIABLE (:as-variable topic)}}}}}}
                                                              :SUBSTACK
                                                              {:opcode "data_addtolist"
-                                                              :fields {:LIST learned-topics}
+                                                              :fields {:LIST (:as-list learned-topics)}
                                                               :inputs {:ITEM
                                                                        {:opcode "data_variable"
-                                                                        :fields {:VARIABLE topic}}}}}
+                                                                        :fields {:VARIABLE (:as-variable topic)}}}}}
                                                     :next {:opcode "data_changevariableby"
-                                                           :fields {:VARIABLE counter}
+                                                           :fields {:VARIABLE (:as-variable counter)}
                                                            :inputs {:VALUE (number-input 1)}}}}}}}}}}}))
 
 (defn generate-script-4
@@ -180,39 +193,39 @@
     :topLevel true :x x :y y
     :fields {:BROADCAST_OPTION (:as-variable topics-updated)}
     :next {:opcode "data_setvariableto"
-           :fields {:VARIABLE available}
+           :fields {:VARIABLE (:as-variable available)}
            :inputs {:VALUE (text-input "true")}
            :next {:opcode "data_setvariableto"
-                  :fields {:VARIABLE counter}
+                  :fields {:VARIABLE (:as-variable counter)}
                   :inputs {:VALUE (number-input 1)}
                   :next {:opcode "control_repeat"
                          :inputs {:TIMES
                                   {:opcode "data_lengthoflist"
-                                   :fields {:LIST my-uses}}
+                                   :fields {:LIST (:as-list my-uses)}}
                                   :SUBSTACK
                                   {:opcode "data_setvariableto"
-                                   :fields {:VARIABLE topic}
+                                   :fields {:VARIABLE (:as-variable topic)}
                                    :inputs {:VALUE
                                             {:opcode "data_itemoflist"
-                                             :fields {:LIST my-uses}
+                                             :fields {:LIST (:as-list my-uses)}
                                              :inputs {:INDEX
                                                       {:opcode "data_variable"
-                                                       :fields {:VARIABLE counter}}}}}
+                                                       :fields {:VARIABLE (:as-variable counter)}}}}}
                                    :next {:opcode "control_if"
                                           :inputs {:CONDITION
                                                    {:opcode "operator_not"
                                                     :inputs {:OPERAND
                                                              {:opcode "data_listcontainsitem"
-                                                              :fields {:LIST learned-topics}
+                                                              :fields {:LIST (:as-list learned-topics)}
                                                               :inputs {:ITEM
                                                                        {:opcode "data_variable"
-                                                                        :fields {:VARIABLE topic}}}}}}
+                                                                        :fields {:VARIABLE (:as-variable topic)}}}}}}
                                                    :SUBSTACK
                                                    {:opcode "data_setvariableto"
-                                                    :fields {:VARIABLE available}
+                                                    :fields {:VARIABLE (:as-variable available)}
                                                     :inputs {:VALUE (text-input "false")}}}
                                           :next {:opcode "data_changevariableby"
-                                                 :fields {:VARIABLE counter}
+                                                 :fields {:VARIABLE (:as-variable counter)}
                                                  :inputs {:VALUE (number-input 1)}}}}}
                          :next {:opcode "control_if_else"
                                 :inputs {:CONDITION
@@ -221,7 +234,7 @@
                                                    {:opcode "operator_equals"
                                                     :inputs {:OPERAND1
                                                              {:opcode "data_variable"
-                                                              :fields {:VARIABLE available}}
+                                                              :fields {:VARIABLE (:as-variable available)}}
                                                              :OPERAND2 (text-input "true")}}
                                                    :OPERAND2
                                                    {:opcode "operator_not"
@@ -229,7 +242,7 @@
                                                              {:opcode "operator_equals"
                                                               :inputs {:OPERAND1
                                                                        {:opcode "data_variable"
-                                                                        :fields {:VARIABLE is-completed}}
+                                                                        :fields {:VARIABLE (:as-variable is-completed)}}
                                                                        :OPERAND2 (text-input "true")}}}}}}
                                          :SUBSTACK
                                          {:opcode "looks_show"}
@@ -282,15 +295,13 @@
 (defn create-lesson-sprite [ctx lesson]
   (let [lesson-num (:lessonNumber lesson)
 
-        variables (make-variables {:is-completed false
-                                   :available false
-                                   :topic ""
-                                   :counter 0})
-        lists (make-variables {:my-intros (:intros lesson)
-                               :my-uses (:uses lesson)})
         ctx (merge ctx
-                   (:ctx variables)
-                   (:ctx lists)
+                   (make-variables {:is-completed false
+                                    :available false
+                                    :topic ""
+                                    :counter 0})
+                   (make-lists {:my-intros (:intros lesson)
+                                :my-uses (:uses lesson)})
                    {:lesson-num lesson-num})
 
         pos (lesson-position lesson-num)
@@ -298,11 +309,10 @@
                           (generate-script-3 ctx (+ 1000 (:x pos)) (:y pos))
                           (generate-script-4 ctx (+ 1500 (:x pos)) (:y pos)))
         costume-data (create-costume (generate-lesson-costume (:name lesson)) (:name lesson))]
-
     {:target {:isStage false
               :name (:name lesson)
-              :variables (:variables variables)
-              :lists (:variables lists)
+              :variables (into {} (keep :variable) (vals ctx))
+              :lists (into {} (keep :list) (vals ctx))
               :broadcasts {}
               :blocks all-blocks
               :comments {}
@@ -325,7 +335,7 @@
                 {:opcode "event_whenthisspriteclicked"
                  :topLevel true :x -200 :y -150
                  :next {:opcode "data_deleteoflist"
-                        :fields {:LIST completed-lessons}
+                        :fields {:LIST (:as-list completed-lessons)}
                         :inputs {:INDEX (number-input "last")}
                         :next {:opcode "event_broadcast"
                                :inputs {:BROADCAST_INPUT (:as-input rebuild-state)}}}})
@@ -353,8 +363,7 @@
               :rotationStyle "all around"}
      :assets [costume-data]}))
 
-(defn create-stage [{:keys [learned-topics rebuild-state add-your-topics topics-updated] :as ctx}
-                    stage-lists]
+(defn create-stage [{:keys [learned-topics rebuild-state add-your-topics topics-updated] :as ctx}]
   (let [;; Initial flag script to trigger topics updated
         flagclicked (top-level-block
                      {:opcode "event_whenflagclicked"
@@ -366,7 +375,7 @@
                        :topLevel true :x 500 :y 0
                        :fields {:BROADCAST_OPTION (:as-variable rebuild-state)}
                        :next {:opcode "data_deletealloflist"
-                              :fields {:LIST learned-topics}
+                              :fields {:LIST (:as-list learned-topics)}
                               :next {:opcode "event_broadcastandwait"
                                      :inputs {:BROADCAST_INPUT (:as-input add-your-topics)}
                                      :next {:opcode "event_broadcast"
@@ -375,7 +384,7 @@
     {:target {:isStage true
               :name "Stage"
               :variables {}
-              :lists (:variables stage-lists)
+              :lists (into {} (keep :stage-list) (vals ctx))
               :broadcasts (into {} (keep :broadcast) (vals ctx))
               :blocks (merge flagclicked rebuildstate)
               :comments {}
@@ -396,12 +405,11 @@
 
 (defn generate-sb3 [lessons output-sb3-path]
   (binding [*block-counter* 0]
-    (let [stage-lists (make-variables {:learned-topics []
-                                       :completed-lessons []})
-          ctx (merge (:ctx stage-lists)
+    (let [ctx (merge (make-stage-lists {:learned-topics []
+                                        :completed-lessons []})
                      (make-broadcasts [:rebuild-state :add-your-topics :topics-updated]))
 
-          builds (-> [(create-stage ctx stage-lists)
+          builds (-> [(create-stage ctx)
                       (create-back-button-sprite ctx)]
                      (into (map #(create-lesson-sprite ctx %) lessons)))
 
