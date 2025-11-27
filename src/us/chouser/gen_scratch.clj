@@ -177,6 +177,9 @@
 
 (defn motion-change-x-by [DX] {:opcode "motion_changexby", :inputs {:DX DX}})
 (defn motion-change-y-by [DY] {:opcode "motion_changeyby", :inputs {:DY DY}})
+(defn motion-goto-random [] {:opcode "motion_goto",
+                             :inputs {:TO {:opcode "motion_goto_menu",
+                                           :fields {:TO ["_random_" nil]}}}})
 
 (defn motion-x-position [] {:opcode "motion_xposition"})
 (defn motion-y-position [] {:opcode "motion_yposition"})
@@ -230,6 +233,13 @@
             m (repeatedly generate-id))
        (into {})))
 
+(defn make-stage-variables [m]
+  (->> (map (fn [[k init] id]
+              [k {:stage-variable [id [k init]]
+                  :as-variable [k id]}])
+            m (repeatedly generate-id))
+       (into {})))
+
 (defn make-lists [m]
   (->> (map (fn [[k init] id]
               [k {:list [id [k init]]
@@ -254,75 +264,81 @@
 
 (defn generate-script-1
   "When this sprite clicked - toggle lesson completion"
-  [{:keys [completed-lessons lesson-num rebuild-state]} x y]
+  [{:keys [completed-lessons is-animating lesson-num rebuild-state]} x y]
   (top-level-block
    (event-when-sprite-clicked :x x :y y)
    (control-if
     (op-not (op-contains? completed-lessons (number-input lesson-num)))
     (do-block
+     (data-set-variable is-animating (text-input "false"))
+     (control-wait (number-input 0.1))
      (data-add-to-list completed-lessons (number-input lesson-num))
      (event-broadcast rebuild-state)))))
 
 (defn generate-script-2
   "On flag, start animating"
-  [{:keys [lesson-num lesson-xs lesson-ys counter available is-completed fx fy dx dy dist-sq repel-strength]} x y]
+  [{:keys [lesson-num lesson-xs lesson-ys counter is-animating available is-completed fx fy dx dy dist-sq repel-strength]} x y]
   (top-level-block
    (event-when-flag-clicked :x x :y y)
+   (motion-goto-random)
    (control-forever
-    (do-block
-     ;; Record current position
-     (control-if-else
-      (op-or (op-equals (data-variable available) (text-input "false"))
-             (op-equals (data-variable is-completed) (text-input "true")))
+    (control-if-else
+     (op-equals (data-variable is-animating) (text-input "false"))
+     (control-wait (number-input 0.2))
+     (do-block
+      ;; Record current position
+      (control-if-else
+       (op-or (op-equals (data-variable available) (text-input "false"))
+              (op-equals (data-variable is-completed) (text-input "true")))
 
-      (do-block
-       (data-replace-list-item lesson-xs (number-input lesson-num) (text-input ""))
-       (data-replace-list-item lesson-ys (number-input lesson-num) (text-input "")))
-      (do-block
-       (data-replace-list-item lesson-xs (number-input lesson-num) (motion-x-position))
-       (data-replace-list-item lesson-ys (number-input lesson-num) (motion-y-position))
+       (do-block
+        (data-replace-list-item lesson-xs (number-input lesson-num) (text-input ""))
+        (data-replace-list-item lesson-ys (number-input lesson-num) (text-input "")))
+       (do-block
+        (data-replace-list-item lesson-xs (number-input lesson-num) (motion-x-position))
+        (data-replace-list-item lesson-ys (number-input lesson-num) (motion-y-position))
 
-       ;; Initialize force accumulators
-       (data-set-variable fx (number-input 0))
-       (data-set-variable fy (number-input 0))
+        ;; Initialize force accumulators
+        (data-set-variable fx (number-input 0))
+        (data-set-variable fy (number-input 0))
 
-       ;; Attraction to center
-       (data-change-variable fx (op-* (motion-x-position) (number-input -0.01)))
-       (data-change-variable fy (op-* (motion-y-position) (number-input -0.01)))
+        ;; Attraction to center
+        (data-change-variable fx (op-* (motion-x-position) (number-input -0.01)))
+        (data-change-variable fy (op-* (motion-y-position) (number-input -0.01)))
 
-       ;; Repulsion from other sprites
-       (data-set-variable counter (number-input 0))
-       (control-repeat (data-length-of-list lesson-xs)
-                       (do-block
-                        (data-change-variable counter (number-input 1))
-                        ;; Skip self and hidden lessons
-                        (control-if (op-and
-                                     (op-not (op-equals (data-variable counter) (number-input lesson-num)))
-                                     (op-not (op-equals (data-item-of-list lesson-xs (data-variable counter)) (text-input ""))))
-                                    (do-block
-                                     ;; Calculate dx and dy
-                                     (data-set-variable dx (op-- (data-item-of-list lesson-xs (data-variable counter))
-                                                                 (motion-x-position)))
-                                     (data-set-variable dy (op-- (data-item-of-list lesson-ys (data-variable counter))
-                                                                 (motion-y-position)))
+        ;; Repulsion from other sprites
+        (data-set-variable counter (number-input 0))
+        (control-repeat (data-length-of-list lesson-xs)
+                        (do-block
+                         (data-change-variable counter (number-input 1))
+                         ;; Skip self and hidden lessons
+                         (control-if (op-and
+                                      (op-not (op-equals (data-variable counter) (number-input lesson-num)))
+                                      (op-not (op-equals (data-item-of-list lesson-xs (data-variable counter)) (text-input ""))))
+                                     (do-block
+                                      ;; Calculate dx and dy
+                                      (data-set-variable dx (op-- (data-item-of-list lesson-xs (data-variable counter))
+                                                                  (motion-x-position)))
+                                      (data-set-variable dy (op-- (data-item-of-list lesson-ys (data-variable counter))
+                                                                  (motion-y-position)))
 
-                                     ;; Calculate distance squared (avoid sqrt for performance)
-                                     (data-set-variable dist-sq (op-+ (op-* (data-variable dx) (data-variable dx))
-                                                                      (op-* (data-variable dy) (data-variable dy))))
+                                      ;; Calculate distance squared (avoid sqrt for performance)
+                                      (data-set-variable dist-sq (op-+ (op-* (data-variable dx) (data-variable dx))
+                                                                       (op-* (data-variable dy) (data-variable dy))))
 
-                                     ;; Avoid division by zero, apply repulsion force
-                                     (control-if (op-gt (data-variable dist-sq) (number-input 1))
-                                                 (do-block
-                                                  ;; Repulsion strength / distance-squared, then multiply by direction
-                                                  (data-set-variable repel-strength (op-divide (number-input 10) (data-variable dist-sq)))
-                                                  (data-change-variable fx (op-* (data-variable dx)
-                                                                                 (op-* (data-variable repel-strength) (number-input -1))))
-                                                  (data-change-variable fy (op-* (data-variable dy)
-                                                                                 (op-* (data-variable repel-strength) (number-input -1))))))))))
+                                      ;; Avoid division by zero, apply repulsion force
+                                      (control-if (op-gt (data-variable dist-sq) (number-input 1))
+                                                  (do-block
+                                                   ;; Repulsion strength / distance-squared, then multiply by direction
+                                                   (data-set-variable repel-strength (op-divide (number-input 40) (data-variable dist-sq)))
+                                                   (data-change-variable fx (op-* (data-variable dx)
+                                                                                  (op-* (data-variable repel-strength) (number-input -1))))
+                                                   (data-change-variable fy (op-* (data-variable dy)
+                                                                                  (op-* (data-variable repel-strength) (number-input -1))))))))))
 
-       ;; Apply forces with damping
-       (motion-change-x-by (op-* (data-variable fx) (number-input 2.0)))
-       (motion-change-y-by (op-* (data-variable fy) (number-input 2.0)))))))))
+        ;; Apply forces with damping
+        (motion-change-x-by (op-* (data-variable fx) (number-input 2.0)))
+        (motion-change-y-by (op-* (data-variable fy) (number-input 2.0))))))))))
 
 (defn generate-script-3
   "When receiving add your topics"
@@ -452,9 +468,11 @@
               :rotationStyle "all around"}
      :assets [costume-data]}))
 
-(defn create-back-button-sprite [{:keys [completed-lessons rebuild-state]}]
+(defn create-back-button-sprite [{:keys [is-animating completed-lessons rebuild-state]}]
   (let [blocks (top-level-block
                 (event-when-sprite-clicked :x -200 :y -150)
+                (data-set-variable is-animating (text-input "false"))
+                (control-wait (number-input 0.1))
                 (data-delete-from-list completed-lessons (number-input "last"))
                 (event-broadcast rebuild-state))
 
@@ -481,20 +499,23 @@
               :rotationStyle "all around"}
      :assets [costume-data]}))
 
-(defn create-stage [{:keys [learned-topics rebuild-state add-your-topics topics-updated] :as ctx}]
+(defn create-stage [{:keys [is-animating learned-topics rebuild-state add-your-topics topics-updated] :as ctx}]
   (let [;; Initial flag script to trigger topics updated
         flagclicked (top-level-block
+                     (data-set-variable is-animating (text-input "false"))
+                     (control-wait (number-input 0.1))
                      (event-when-flag-clicked :x 0 :y 0)
                      (event-broadcast rebuild-state))
         rebuildstate (top-level-block
                       (event-when-broadcast-received rebuild-state :x 500 :y 0)
                       (data-delete-all-list learned-topics)
                       (event-broadcast-and-wait add-your-topics)
-                      (event-broadcast topics-updated))
+                      (event-broadcast-and-wait topics-updated)
+                      (data-set-variable is-animating (text-input "true")))
         backdrop-data (create-costume (generate-stage-backdrop) "backdrop1")]
     {:target {:isStage true
               :name "Stage"
-              :variables {}
+              :variables (into {} (keep :stage-variable) (vals ctx))
               :lists (into {} (keep :stage-list) (vals ctx))
               :broadcasts (into {} (keep :broadcast) (vals ctx))
               :blocks (merge flagclicked rebuildstate)
@@ -516,7 +537,8 @@
 
 (defn generate-sb3 [lessons output-sb3-path]
   (binding [*block-counter* 0]
-    (let [ctx (merge (make-stage-lists {:learned-topics []
+    (let [ctx (merge (make-stage-variables {:is-animating true})
+                     (make-stage-lists {:learned-topics []
                                         :completed-lessons []
                                         :lesson-xs (vec (repeat (count lessons) ""))
                                         :lesson-ys (vec (repeat (count lessons) ""))})
