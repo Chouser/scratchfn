@@ -50,10 +50,40 @@
    :inputs {:OPERAND1 OPERAND1
             :OPERAND2 OPERAND2}})
 
+(defn op-or [OPERAND1 OPERAND2]
+  {:opcode "operator_or"
+   :inputs {:OPERAND1 OPERAND1
+            :OPERAND2 OPERAND2}})
+
 (defn op-equals [OPERAND1 OPERAND2]
   {:opcode "operator_equals"
    :inputs {:OPERAND1 OPERAND1
             :OPERAND2 OPERAND2}})
+
+(defn op-gt [OPERAND1 OPERAND2]
+  {:opcode "operator_gt"
+   :inputs {:OPERAND1 OPERAND1
+            :OPERAND2 OPERAND2}})
+
+(defn op-+ [NUM1 NUM2]
+  {:opcode "operator_add"
+   :inputs {:NUM1 NUM1
+            :NUM2 NUM2}})
+
+(defn op-- [NUM1 NUM2]
+  {:opcode "operator_subtract"
+   :inputs {:NUM1 NUM1
+            :NUM2 NUM2}})
+
+(defn op-* [NUM1 NUM2]
+  {:opcode "operator_multiply"
+   :inputs {:NUM1 NUM1
+            :NUM2 NUM2}})
+
+(defn op-divide [NUM1 NUM2]
+  {:opcode "operator_divide"
+   :inputs {:NUM1 NUM1
+            :NUM2 NUM2}})
 
 (defn data-variable [VARIABLE]
   {:opcode "data_variable"
@@ -73,6 +103,11 @@
   {:opcode "data_addtolist"
    :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
    :inputs {:ITEM ITEM}})
+
+(defn data-replace-list-item [LIST INDEX ITEM]
+  {:opcode "data_replaceitemoflist"
+   :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
+   :inputs {:INDEX INDEX, :ITEM ITEM}})
 
 (defn data-delete-from-list [LIST INDEX]
   {:opcode "data_deleteoflist"
@@ -108,6 +143,14 @@
    :inputs {:TIMES TIMES
             :SUBSTACK SUBSTACK}})
 
+(defn control-forever [SUBSTACK]
+  {:opcode "control_forever"
+   :inputs {:SUBSTACK SUBSTACK}})
+
+(defn control-wait [DURATION]
+  {:opcode "control_wait"
+   :inputs {:DURATION DURATION}})
+
 (defn event-broadcast [BROADCAST_INPUT]
   {:opcode "event_broadcast"
    :inputs {:BROADCAST_INPUT (or (:as-input BROADCAST_INPUT) (throw (ex-info "Expected broadcast" {:broadcast BROADCAST_INPUT})))}})
@@ -132,6 +175,14 @@
           :fields {:BROADCAST_OPTION (or (:as-variable BROADCAST_OPTION) (throw (ex-info "Expected broadcast" {:broadcast BROADCAST_OPTION})))}}
          opts))
 
+(defn motion-change-x-by [DX] {:opcode "motion_changexby", :inputs {:DX DX}})
+(defn motion-change-y-by [DY] {:opcode "motion_changeyby", :inputs {:DY DY}})
+
+(defn motion-x-position [] {:opcode "motion_xposition"})
+(defn motion-y-position [] {:opcode "motion_yposition"})
+(defn looks-show [] {:opcode "looks_show"})
+(defn looks-hide [] {:opcode "looks_hide"})
+
 (defn do-block
   "Chain blocks together using :next. Takes multiple blocks and links them sequentially."
   [& blocks]
@@ -139,12 +190,6 @@
             (assoc block :next acc))
           nil
           (reverse blocks)))
-
-(defn looks-show []
-  {:opcode "looks_show"})
-
-(defn looks-hide []
-  {:opcode "looks_hide"})
 
 ;; ============================================================================
 ;; Script Generation for Lesson Sprites
@@ -158,8 +203,7 @@
      :blocks (mapcat :blocks flats)}))
 
 ;; return a seq of [id node], where the first in the sequence is the "top"
-(defn flatten-block
-  [parent-id block]
+(defn flatten-block [parent-id block]
   (if-not (map? block)
     {:top block}
     (let [id (str "block" (set! *block-counter* (inc *block-counter*)))
@@ -219,6 +263,67 @@
      (data-add-to-list completed-lessons (number-input lesson-num))
      (event-broadcast rebuild-state)))))
 
+(defn generate-script-2
+  "On flag, start animating"
+  [{:keys [lesson-num lesson-xs lesson-ys counter available fx fy dx dy dist-sq repel-strength]} x y]
+  (top-level-block
+   (event-when-flag-clicked :x x :y y)
+   (control-forever
+    (do-block
+     (control-wait (number-input 0.1))
+     ;; Record current position
+     (control-if-else
+      (op-not (op-equals (data-variable available) (text-input "true")))
+
+      (do-block
+       (data-replace-list-item lesson-xs (number-input lesson-num) (text-input ""))
+       (data-replace-list-item lesson-ys (number-input lesson-num) (text-input "")))
+      (do-block
+       (data-replace-list-item lesson-xs (number-input lesson-num) (motion-x-position))
+       (data-replace-list-item lesson-ys (number-input lesson-num) (motion-y-position))
+
+       ;; Initialize force accumulators
+       (data-set-variable fx (number-input 0))
+       (data-set-variable fy (number-input 0))
+
+       ;; Attraction to center
+       (data-change-variable fx (op-* (motion-x-position) (number-input -0.01)))
+       (data-change-variable fy (op-* (motion-y-position) (number-input -0.01)))
+
+       ;; Repulsion from other sprites
+       (data-set-variable counter (number-input 0))
+       (control-repeat (data-length-of-list lesson-xs)
+                       (do-block
+                        (data-change-variable counter (number-input 1))
+                        ;; Skip self and hidden lessons
+                        (control-if (op-and
+                                     (op-not (op-equals (data-variable counter) (number-input lesson-num)))
+                                     (op-not (op-equals (data-item-of-list lesson-xs (data-variable counter)) (text-input ""))))
+                                    (do-block
+                                     ;; Calculate dx and dy
+                                     (data-set-variable dx (op-- (data-item-of-list lesson-xs (data-variable counter))
+                                                                 (motion-x-position)))
+                                     (data-set-variable dy (op-- (data-item-of-list lesson-ys (data-variable counter))
+                                                                 (motion-y-position)))
+
+                                     ;; Calculate distance squared (avoid sqrt for performance)
+                                     (data-set-variable dist-sq (op-+ (op-* (data-variable dx) (data-variable dx))
+                                                                      (op-* (data-variable dy) (data-variable dy))))
+
+                                     ;; Avoid division by zero, apply repulsion force
+                                     (control-if (op-gt (data-variable dist-sq) (number-input 1))
+                                                 (do-block
+                                                  ;; Repulsion strength / distance-squared, then multiply by direction
+                                                  (data-set-variable repel-strength (op-divide (number-input 10) (data-variable dist-sq)))
+                                                  (data-change-variable fx (op-* (data-variable dx)
+                                                                                 (op-* (data-variable repel-strength) (number-input -1))))
+                                                  (data-change-variable fy (op-* (data-variable dy)
+                                                                                 (op-* (data-variable repel-strength) (number-input -1))))))))))
+
+       ;; Apply forces with damping
+       (motion-change-x-by (op-* (data-variable fx) (number-input 2.0)))
+       (motion-change-y-by (op-* (data-variable fy) (number-input 2.0)))))))))
+
 (defn generate-script-3
   "When receiving add your topics"
   [{:keys [learned-topics completed-lessons is-completed my-intros lesson-num add-your-topics topic counter] :as ctx} x y]
@@ -254,9 +359,8 @@
       (data-set-variable available (text-input "false")))
      (data-change-variable counter (number-input 1))))
    (control-if-else
-    (op-and
-     (op-equals (data-variable available) (text-input "true"))
-     (op-not (op-equals (data-variable is-completed) (text-input "true"))))
+    (op-and (op-equals (data-variable available) (text-input "true"))
+            (op-not (op-equals (data-variable is-completed) (text-input "true"))))
     (looks-show)
     (looks-hide))))
 
@@ -310,13 +414,20 @@
                    (make-variables {:is-completed false
                                     :available false
                                     :topic ""
-                                    :counter 0})
+                                    :counter 0
+                                    :fx 0
+                                    :fy 0
+                                    :dx 0
+                                    :dy 0
+                                    :dist-sq 0
+                                    :repel-strength 0})
                    (make-lists {:my-intros (:intros lesson)
                                 :my-uses (:uses lesson)})
                    {:lesson-num lesson-num})
 
         pos (lesson-position lesson-num)
         all-blocks (merge (generate-script-1 ctx (:x pos) (:y pos))
+                          (generate-script-2 ctx (+ 500 (:x pos)) (:y pos))
                           (generate-script-3 ctx (+ 1000 (:x pos)) (:y pos))
                           (generate-script-4 ctx (+ 1500 (:x pos)) (:y pos)))
         costume-data (create-costume (generate-lesson-costume (:name lesson)) (:name lesson))]
@@ -406,7 +517,9 @@
 (defn generate-sb3 [lessons output-sb3-path]
   (binding [*block-counter* 0]
     (let [ctx (merge (make-stage-lists {:learned-topics []
-                                        :completed-lessons []})
+                                        :completed-lessons []
+                                        :lesson-xs (vec (repeat (count lessons) ""))
+                                        :lesson-ys (vec (repeat (count lessons) ""))})
                      (make-broadcasts [:rebuild-state :add-your-topics :topics-updated]))
 
           builds (-> [(create-stage ctx)
