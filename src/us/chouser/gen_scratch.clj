@@ -265,15 +265,15 @@
 
 (defn generate-script-2
   "On flag, start animating"
-  [{:keys [lesson-num lesson-xs lesson-ys counter available fx fy dx dy dist-sq repel-strength]} x y]
+  [{:keys [lesson-num lesson-xs lesson-ys counter available is-completed fx fy dx dy dist-sq repel-strength]} x y]
   (top-level-block
    (event-when-flag-clicked :x x :y y)
    (control-forever
     (do-block
-     (control-wait (number-input 0.1))
      ;; Record current position
      (control-if-else
-      (op-not (op-equals (data-variable available) (text-input "true")))
+      (op-or (op-equals (data-variable available) (text-input "false"))
+             (op-equals (data-variable is-completed) (text-input "true")))
 
       (do-block
        (data-replace-list-item lesson-xs (number-input lesson-num) (text-input ""))
