@@ -1,8 +1,11 @@
 (ns us.chouser.gen-scratch
-  (:require [clojure.data.json :as json])
+  (:require [clojure.data.json :as json]
+            [clojure.string :as str]
+            [clojure.java.io :as io])
   (:import [java.util.zip ZipOutputStream ZipEntry]
            [java.io FileOutputStream]
-           [java.security MessageDigest]))
+           [java.security MessageDigest]
+           [java.util Base64]))
 
 ;; ============================================================================
 ;; Utility Functions
@@ -402,11 +405,33 @@
   <text x=\"40\" y=\"25\" text-anchor=\"middle\" font-family=\"Arial\" font-size=\"16\" fill=\"#ffffff\">Back</text>
 </svg>")
 
-(defn generate-lesson-costume [lesson-name]
-  (format "<svg version=\"1.1\" width=\"90\" height=\"60\" viewBox=\"0 0 90 60\">
-  <rect width=\"90\" height=\"60\" fill=\"#4287f5\" stroke=\"#000000\" stroke-width=\"2\"/>
-  <text x=\"45\" y=\"35\" text-anchor=\"middle\" font-family=\"Arial\" font-size=\"12\" fill=\"#ffffff\">%s</text>
-</svg>" lesson-name))
+(defn file-to-base64 [file-path]
+  (let [file-path (if (.exists (io/file file-path))
+                    file-path
+                    "thumbs/Jumpy Monkey.jpg")
+        bytes (with-open [in (io/input-stream file-path)]
+                (let [baos (java.io.ByteArrayOutputStream.)]
+                  (io/copy in baos)
+                  (.toByteArray baos)))]
+    (.encodeToString (Base64/getEncoder) bytes)))
+
+(defn generate-lesson-costume [lesson-name jpeg-path]
+  (let [lines (or (seq (re-seq #".{1,15}(?:\s|$)" lesson-name))
+                  [lesson-name])
+        line-height 14
+        bottom-y 52
+        start-y (- bottom-y (* (dec (count lines)) line-height))
+        text-elements (map-indexed
+                       (fn [idx line]
+                         (format (str "<text x=\"45\" y=\"%d\" text-anchor=\"middle\""
+                                      "  font-family=\"Arial\" font-size=\"12\" fill=\"#ffffff\""
+                                      "  stroke=\"#000000\" stroke-width=\"0.5\">%s</text>")
+                                 (+ start-y (* idx line-height))
+                                 (str/trim line)))
+                       lines)]
+    (format "<svg version=\"1.1\" width=\"90\" height=\"60\" viewBox=\"0 0 90 60\">
+  <image href=\"data:image/jpeg;base64,%s\" width=\"90\" height=\"60\"/>%s</svg>"
+            (file-to-base64 jpeg-path) (str/join "\n  " text-elements))))
 
 (defn create-costume [svg-content name]
   (let [hash (md5-hash svg-content)
@@ -453,7 +478,8 @@
                           (generate-script-2 ctx (+ 500 (:x pos)) (:y pos))
                           (generate-script-3 ctx (+ 1000 (:x pos)) (:y pos))
                           (generate-script-4 ctx (+ 1500 (:x pos)) (:y pos)))
-        costume-data (create-costume (generate-lesson-costume (:name lesson)) (:name lesson))]
+        costume-data (create-costume (generate-lesson-costume (:name lesson) (format "thumbs/%s.jpg" (:name lesson)))
+                                     (:name lesson))]
     {:target {:isStage false
               :name (:name lesson)
               :variables (into {} (keep :variable) (vals ctx))
