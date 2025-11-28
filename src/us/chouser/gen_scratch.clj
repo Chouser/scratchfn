@@ -185,6 +185,11 @@
 (defn motion-y-position [] {:opcode "motion_yposition"})
 (defn looks-show [] {:opcode "looks_show"})
 (defn looks-hide [] {:opcode "looks_hide"})
+(defn looks-change-effect-by [EFFECT CHANGE]
+  (assert (contains? #{:GHOST} EFFECT))
+  {:opcode "looks_changeeffectby"
+   :fields {:EFFECT [EFFECT nil]}
+   :inputs {:CHANGE CHANGE}})
 
 (defn do-block
   "Chain blocks together using :next. Takes multiple blocks and links them sequentially."
@@ -277,7 +282,7 @@
 
 (defn generate-script-2
   "On flag, start animating"
-  [{:keys [lesson-num lesson-xs lesson-ys counter is-animating available is-completed fx fy dx dy dist-sq repel-strength]} x y]
+  [{:keys [lesson-num lesson-xs lesson-ys counter is-animating is-available is-completed fx fy dx dy dist-sq repel-strength]} x y]
   (top-level-block
    (event-when-flag-clicked :x x :y y)
    (motion-goto-random)
@@ -288,13 +293,15 @@
      (do-block
       ;; Record current position
       (control-if-else
-       (op-or (op-equals (data-variable available) (text-input "false"))
+       (op-or (op-equals (data-variable is-available) (text-input "false"))
               (op-equals (data-variable is-completed) (text-input "true")))
 
        (do-block
+        (looks-change-effect-by :GHOST (number-input 0.2))
         (data-replace-list-item lesson-xs (number-input lesson-num) (text-input ""))
         (data-replace-list-item lesson-ys (number-input lesson-num) (text-input "")))
        (do-block
+        (looks-change-effect-by :GHOST (number-input -1))
         (data-replace-list-item lesson-xs (number-input lesson-num) (motion-x-position))
         (data-replace-list-item lesson-ys (number-input lesson-num) (motion-y-position))
 
@@ -361,10 +368,10 @@
 
 (defn generate-script-4
   "When receiving topics updated - show/hide based on availability"
-  [{:keys [learned-topics available my-uses is-completed topic counter topics-updated] :as ctx} x y]
+  [{:keys [learned-topics is-available my-uses is-completed topic counter topics-updated] :as ctx} x y]
   (top-level-block
    (event-when-broadcast-received topics-updated :x x :y y)
-   (data-set-variable available (text-input "true"))
+   (data-set-variable is-available (text-input "true"))
    (data-set-variable counter (number-input 1))
    (control-repeat
     (data-length-of-list my-uses)
@@ -372,10 +379,10 @@
      (data-set-variable topic (data-item-of-list my-uses (data-variable counter)))
      (control-if
       (op-not (op-contains? learned-topics (data-variable topic)))
-      (data-set-variable available (text-input "false")))
+      (data-set-variable is-available (text-input "false")))
      (data-change-variable counter (number-input 1))))
-   (control-if-else
-    (op-and (op-equals (data-variable available) (text-input "true"))
+   #_(control-if-else
+    (op-and (op-equals (data-variable is-available) (text-input "true"))
             (op-not (op-equals (data-variable is-completed) (text-input "true"))))
     (looks-show)
     (looks-hide))))
@@ -428,7 +435,7 @@
 
         ctx (merge ctx
                    (make-variables {:is-completed false
-                                    :available false
+                                    :is-available false
                                     :topic ""
                                     :counter 0
                                     :fx 0
