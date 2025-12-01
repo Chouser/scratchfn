@@ -1,7 +1,5 @@
 (ns us.chouser.gen-scratch
-  (:require [clojure.data.json :as json]
-            [clojure.string :as str]
-            [clojure.java.io :as io])
+  (:require [clojure.data.json :as json])
   (:import [java.util.zip ZipOutputStream ZipEntry]
            [java.io FileOutputStream]
            [java.security MessageDigest]
@@ -20,6 +18,16 @@
   (let [digest (MessageDigest/getInstance "MD5")
         bytes (.digest digest (.getBytes content "UTF-8"))]
     (apply str (map #(format "%02x" %) bytes))))
+
+(defn file-to-base64 [file-path]
+  (let [file-path (if (.exists (io/file file-path))
+                    file-path
+                    "thumbs/Jumpy Monkey.jpg")
+        bytes (with-open [in (io/input-stream file-path)]
+                (let [baos (java.io.ByteArrayOutputStream.)]
+                  (io/copy in baos)
+                  (.toByteArray baos)))]
+    (.encodeToString (Base64/getEncoder) bytes)))
 
 ;; ============================================================================
 ;; Block Generation Helpers
@@ -270,336 +278,40 @@
             ks (repeatedly generate-id))
        (into {})))
 
-(defn generate-script-1
-  "When this sprite clicked - toggle lesson completion"
-  [{:keys [completed-lessons is-animating lesson-num rebuild-state]} x y]
-  (top-level-block
-   (event-when-sprite-clicked :x x :y y)
-   (control-if
-    (op-not (op-contains? completed-lessons (number-input lesson-num)))
-    (do-block
-     (data-set-variable is-animating (text-input "false"))
-     (control-wait (number-input 0.1))
-     (data-add-to-list completed-lessons (number-input lesson-num))
-     (event-broadcast rebuild-state)))))
+(defn generate-sb3 [output-sb3-path builds]
+  (let [assets (cons
+                {:file-name "project.json"
+                 :content (-> {:targets (mapv :target builds)
+                               :monitors []
+                               :extensions []
+                               :meta {:semver "3.0.0"
+                                      :vm "0.2.0"
+                                      :agent ""}}
+                              json/write-str)}
+                (mapcat :assets builds))]
 
-(defn generate-script-2
-  "On flag, start animating"
-  [{:keys [lesson-num lesson-xs lesson-ys counter is-animating is-available is-completed fx fy dx dy dist-sq repel-strength]} x y]
-  (top-level-block
-   (event-when-flag-clicked :x x :y y)
-   (motion-goto-random)
-   (control-forever
-    (control-if-else
-     (op-equals (data-variable is-animating) (text-input "false"))
-     (control-wait (number-input 0.2))
-     (do-block
-      ;; Record current position
-      (control-if-else
-       (op-or (op-equals (data-variable is-available) (text-input "false"))
-              (op-equals (data-variable is-completed) (text-input "true")))
+    ;; Write ZIP file
+    (with-open [zip (ZipOutputStream. (FileOutputStream. output-sb3-path))]
+      (doseq [asset assets]
+        (doto zip
+          (.putNextEntry (ZipEntry. (:file-name asset)))
+          (.write (.getBytes (:content asset) "UTF-8"))
+          (.closeEntry))))))
 
-       (do-block
-        (looks-change-effect-by :GHOST (number-input 0.2))
-        (data-replace-list-item lesson-xs (number-input lesson-num) (text-input ""))
-        (data-replace-list-item lesson-ys (number-input lesson-num) (text-input "")))
-       (do-block
-        (looks-change-effect-by :GHOST (number-input -1))
-        (data-replace-list-item lesson-xs (number-input lesson-num) (motion-x-position))
-        (data-replace-list-item lesson-ys (number-input lesson-num) (motion-y-position))
+(defmacro with-ns [ns-specs & body]
+  (let [bindings (mapcat (fn [[selector ns-sym]]
+                           (let [publics (ns-publics
+                                          (or (find-ns ns-sym)
+                                              (get (ns-aliases *ns*) ns-sym)
+                                              (throw (ex-info "no such ns" {:ns-sym ns-sym}))))]
+                             (->> (if (= selector :all)
+                                    publics
+                                    (map (partial find publics) selector))
+                                  (mapcat (fn [[sym var]]
+                                            (when-not (:macro (meta var))
+                                              [sym var]))))))
+                         (partition 2 ns-specs))]
+    `(let [~@bindings]
+       ~@body)))
 
-        ;; Initialize force accumulators
-        (data-set-variable fx (number-input 0))
-        (data-set-variable fy (number-input 0))
 
-        ;; Attraction to center
-        (data-change-variable fx (op-* (motion-x-position) (number-input -0.01)))
-        (data-change-variable fy (op-* (motion-y-position) (number-input -0.01)))
-
-        ;; Repulsion from other sprites
-        (data-set-variable counter (number-input 0))
-        (control-repeat (data-length-of-list lesson-xs)
-                        (do-block
-                         (data-change-variable counter (number-input 1))
-                         ;; Skip self and hidden lessons
-                         (control-if (op-and
-                                      (op-not (op-equals (data-variable counter) (number-input lesson-num)))
-                                      (op-not (op-equals (data-item-of-list lesson-xs (data-variable counter)) (text-input ""))))
-                                     (do-block
-                                      ;; Calculate dx and dy
-                                      (data-set-variable dx (op-- (data-item-of-list lesson-xs (data-variable counter))
-                                                                  (motion-x-position)))
-                                      (data-set-variable dy (op-- (data-item-of-list lesson-ys (data-variable counter))
-                                                                  (motion-y-position)))
-
-                                      ;; Calculate distance squared (avoid sqrt for performance)
-                                      (data-set-variable dist-sq (op-+ (op-* (data-variable dx) (data-variable dx))
-                                                                       (op-* (data-variable dy) (data-variable dy))))
-
-                                      ;; Avoid division by zero, apply repulsion force
-                                      (control-if (op-gt (data-variable dist-sq) (number-input 1))
-                                                  (do-block
-                                                   ;; Repulsion strength / distance-squared, then multiply by direction
-                                                   (data-set-variable repel-strength (op-divide (number-input 40) (data-variable dist-sq)))
-                                                   (data-change-variable fx (op-* (data-variable dx)
-                                                                                  (op-* (data-variable repel-strength) (number-input -1))))
-                                                   (data-change-variable fy (op-* (data-variable dy)
-                                                                                  (op-* (data-variable repel-strength) (number-input -1))))))))))
-
-        ;; Apply forces with damping
-        (motion-change-x-by (op-* (data-variable fx) (number-input 2.0)))
-        (motion-change-y-by (op-* (data-variable fy) (number-input 2.0))))))))))
-
-(defn generate-script-3
-  "When receiving add your topics"
-  [{:keys [learned-topics completed-lessons is-completed my-intros lesson-num add-your-topics topic counter] :as ctx} x y]
-  (top-level-block
-   (event-when-broadcast-received add-your-topics :x x :y y)
-   (data-set-variable is-completed (op-contains? completed-lessons (number-input lesson-num)))
-   (control-if
-    (op-equals (data-variable is-completed) (text-input "true"))
-    (do-block
-     (data-set-variable counter (number-input 1))
-     (control-repeat
-      (data-length-of-list my-intros)
-      (do-block
-       (data-set-variable topic (data-item-of-list my-intros (data-variable counter)))
-       (control-if
-        (op-not (op-contains? learned-topics (data-variable topic)))
-        (data-add-to-list learned-topics (data-variable topic)))
-       (data-change-variable counter (number-input 1))))))))
-
-(defn generate-script-4
-  "When receiving topics updated - show/hide based on availability"
-  [{:keys [learned-topics is-available my-uses is-completed topic counter topics-updated] :as ctx} x y]
-  (top-level-block
-   (event-when-broadcast-received topics-updated :x x :y y)
-   (data-set-variable is-available (text-input "true"))
-   (data-set-variable counter (number-input 1))
-   (control-repeat
-    (data-length-of-list my-uses)
-    (do-block
-     (data-set-variable topic (data-item-of-list my-uses (data-variable counter)))
-     (control-if
-      (op-not (op-contains? learned-topics (data-variable topic)))
-      (data-set-variable is-available (text-input "false")))
-     (data-change-variable counter (number-input 1))))
-   #_(control-if-else
-    (op-and (op-equals (data-variable is-available) (text-input "true"))
-            (op-not (op-equals (data-variable is-completed) (text-input "true"))))
-    (looks-show)
-    (looks-hide))))
-
-;; ============================================================================
-;; Costume Generation
-;; ============================================================================
-
-(defn generate-stage-backdrop []
-  "<svg version=\"1.1\" width=\"480\" height=\"360\" viewBox=\"0 0 480 360\">
-  <rect width=\"480\" height=\"360\" fill=\"#ffffff\"/>
-</svg>")
-
-(defn generate-back-button-costume []
-  "<svg version=\"1.1\" width=\"80\" height=\"40\" viewBox=\"0 0 80 40\">
-  <rect width=\"80\" height=\"40\" fill=\"#ff6b6b\" stroke=\"#000000\" stroke-width=\"2\"/>
-  <text x=\"40\" y=\"25\" text-anchor=\"middle\" font-family=\"Arial\" font-size=\"16\" fill=\"#ffffff\">Back</text>
-</svg>")
-
-(defn file-to-base64 [file-path]
-  (let [file-path (if (.exists (io/file file-path))
-                    file-path
-                    "thumbs/Jumpy Monkey.jpg")
-        bytes (with-open [in (io/input-stream file-path)]
-                (let [baos (java.io.ByteArrayOutputStream.)]
-                  (io/copy in baos)
-                  (.toByteArray baos)))]
-    (.encodeToString (Base64/getEncoder) bytes)))
-
-(defn generate-lesson-costume [lesson-name jpeg-path]
-  (let [lines (or (seq (re-seq #".{1,15}(?:\s|$)" lesson-name))
-                  [lesson-name])
-        line-height 14
-        bottom-y 52
-        start-y (- bottom-y (* (dec (count lines)) line-height))
-        text-elements (map-indexed
-                       (fn [idx line]
-                         (format (str "<text x=\"45\" y=\"%d\" text-anchor=\"middle\""
-                                      "  font-family=\"Arial\" font-size=\"12\" fill=\"#ffffff\""
-                                      "  stroke=\"#000000\" stroke-width=\"0.5\">%s</text>")
-                                 (+ start-y (* idx line-height))
-                                 (str/trim line)))
-                       lines)]
-    (format "<svg version=\"1.1\" width=\"90\" height=\"60\" viewBox=\"0 0 90 60\">
-  <image href=\"data:image/jpeg;base64,%s\" width=\"90\" height=\"60\"/>%s</svg>"
-            (file-to-base64 jpeg-path) (str/join "\n  " text-elements))))
-
-(defn create-costume [svg-content name]
-  (let [hash (md5-hash svg-content)
-        md5ext (str hash ".svg")]
-    {:costume {:assetId hash
-               :name name
-               :md5ext md5ext
-               :dataFormat "svg"
-               :rotationCenterX 45
-               :rotationCenterY 30}
-     :file-name md5ext
-     :content svg-content}))
-
-;; ============================================================================
-;; Sprite Generation
-;; ============================================================================
-
-(defn lesson-position [lesson-num]
-  (let [col (mod (dec lesson-num) 6)
-        row (quot (dec lesson-num) 6)]
-    {:x (- (* col 100) 250)
-     :y (- 150 (* row 80))}))
-
-(defn create-lesson-sprite [ctx lesson]
-  (let [lesson-num (:lessonNumber lesson)
-
-        ctx (merge ctx
-                   (make-variables {:is-completed false
-                                    :is-available false
-                                    :topic ""
-                                    :counter 0
-                                    :fx 0
-                                    :fy 0
-                                    :dx 0
-                                    :dy 0
-                                    :dist-sq 0
-                                    :repel-strength 0})
-                   (make-lists {:my-intros (:intros lesson)
-                                :my-uses (:uses lesson)})
-                   {:lesson-num lesson-num})
-
-        pos (lesson-position lesson-num)
-        all-blocks (merge (generate-script-1 ctx (:x pos) (:y pos))
-                          (generate-script-2 ctx (+ 500 (:x pos)) (:y pos))
-                          (generate-script-3 ctx (+ 1000 (:x pos)) (:y pos))
-                          (generate-script-4 ctx (+ 1500 (:x pos)) (:y pos)))
-        costume-data (create-costume (generate-lesson-costume (:name lesson) (format "thumbs/%s.jpg" (:name lesson)))
-                                     (:name lesson))]
-    {:target {:isStage false
-              :name (:name lesson)
-              :variables (into {} (keep :variable) (vals ctx))
-              :lists (into {} (keep :list) (vals ctx))
-              :broadcasts {}
-              :blocks all-blocks
-              :comments {}
-              :currentCostume 0
-              :costumes [(:costume costume-data)]
-              :sounds []
-              :volume 100
-              :layerOrder (inc lesson-num)
-              :visible true
-              :x (:x pos)
-              :y (:y pos)
-              :size 100
-              :direction 90
-              :draggable false
-              :rotationStyle "all around"}
-     :assets [costume-data]}))
-
-(defn create-back-button-sprite [{:keys [is-animating completed-lessons rebuild-state]}]
-  (let [blocks (top-level-block
-                (event-when-sprite-clicked :x -200 :y -150)
-                (data-set-variable is-animating (text-input "false"))
-                (control-wait (number-input 0.1))
-                (data-delete-from-list completed-lessons (number-input "last"))
-                (event-broadcast rebuild-state))
-
-        costume-data (create-costume (generate-back-button-costume) "back-button")]
-
-    {:target {:isStage false
-              :name "BackButton"
-              :variables {}
-              :lists {}
-              :broadcasts {}
-              :blocks blocks
-              :comments {}
-              :currentCostume 0
-              :costumes [(:costume costume-data)]
-              :sounds []
-              :volume 100
-              :layerOrder 1
-              :visible true
-              :x -200
-              :y -150
-              :size 100
-              :direction 90
-              :draggable false
-              :rotationStyle "all around"}
-     :assets [costume-data]}))
-
-(defn create-stage [{:keys [is-animating learned-topics rebuild-state add-your-topics topics-updated] :as ctx}]
-  (let [;; Initial flag script to trigger topics updated
-        flagclicked (top-level-block
-                     (data-set-variable is-animating (text-input "false"))
-                     (control-wait (number-input 0.1))
-                     (event-when-flag-clicked :x 0 :y 0)
-                     (event-broadcast rebuild-state))
-        rebuildstate (top-level-block
-                      (event-when-broadcast-received rebuild-state :x 500 :y 0)
-                      (data-delete-all-list learned-topics)
-                      (event-broadcast-and-wait add-your-topics)
-                      (event-broadcast-and-wait topics-updated)
-                      (data-set-variable is-animating (text-input "true")))
-        backdrop-data (create-costume (generate-stage-backdrop) "backdrop1")]
-    {:target {:isStage true
-              :name "Stage"
-              :variables (into {} (keep :stage-variable) (vals ctx))
-              :lists (into {} (keep :stage-list) (vals ctx))
-              :broadcasts (into {} (keep :broadcast) (vals ctx))
-              :blocks (merge flagclicked rebuildstate)
-              :comments {}
-              :currentCostume 0
-              :costumes [(:costume backdrop-data)]
-              :sounds []
-              :volume 100
-              :layerOrder 0
-              :tempo 60
-              :videoTransparency 50
-              :videoState "off"
-              :textToSpeechLanguage nil}
-     :assets [backdrop-data]}))
-
-;; ============================================================================
-;; Main Generation Function
-;; ============================================================================
-
-(defn generate-sb3 [lessons output-sb3-path]
-  (binding [*block-counter* 0]
-    (let [ctx (merge (make-stage-variables {:is-animating true})
-                     (make-stage-lists {:learned-topics []
-                                        :completed-lessons []
-                                        :lesson-xs (vec (repeat (count lessons) ""))
-                                        :lesson-ys (vec (repeat (count lessons) ""))})
-                     (make-broadcasts [:rebuild-state :add-your-topics :topics-updated]))
-
-          builds (-> [(create-stage ctx)
-                      (create-back-button-sprite ctx)]
-                     (into (map #(create-lesson-sprite ctx %) lessons)))
-
-          ;; Create project structure
-          project {:targets (mapv :target builds)
-                   :monitors []
-                   :extensions []
-                   :meta {:semver "3.0.0"
-                          :vm "0.2.0"
-                          :agent ""}}]
-
-      ;; Write ZIP file
-      (with-open [zip (ZipOutputStream. (FileOutputStream. output-sb3-path))]
-        ;; Add project.json
-        (.putNextEntry zip (ZipEntry. "project.json"))
-        (.write zip (.getBytes (json/write-str project) "UTF-8"))
-        (.closeEntry zip)
-
-        ;; Add asset files
-        (doseq [asset (mapcat :assets builds)]
-          (.putNextEntry zip (ZipEntry. (:file-name asset)))
-          (.write zip (.getBytes (:content asset) "UTF-8"))
-          (.closeEntry zip)))
-
-      (println (str "Successfully generated " output-sb3-path)))))
