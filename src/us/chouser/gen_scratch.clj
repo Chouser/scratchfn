@@ -44,6 +44,22 @@
   "Create a number input value"
   [1 [4 (str value)]])
 
+(defn as-variable [x]
+  (or (:as-variable x)
+      (throw (ex-info "Expected variable" {:variable x}))))
+
+(defn data-variable [VARIABLE]
+  {:opcode "data_variable"
+   :fields {:VARIABLE (as-variable VARIABLE)}})
+
+(defn as-input [x]
+  (cond (string? x) (text-input x)
+        (number? x) (number-input x)
+        (boolean? x) (text-input (str x))
+        (:as-variable x) (data-variable x)
+        (:opcode x) x
+        :else (throw (ex-info (str "Unknown input object " (pr-str x)) {:x x}))))
+
 ;; ============================================================================
 ;; Opcode Constructor Functions
 ;; ============================================================================
@@ -51,80 +67,78 @@
 (defn op-contains? [LIST ITEM]
   {:opcode "data_listcontainsitem"
    :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
-   :inputs {:ITEM ITEM}})
+   :inputs {:ITEM (as-input ITEM)}})
 
 (defn op-not [OPERAND]
   {:opcode "operator_not"
-   :inputs {:OPERAND OPERAND}})
+   :inputs {:OPERAND (as-input OPERAND)}})
 
 (defn op-and [OPERAND1 OPERAND2]
   {:opcode "operator_and"
-   :inputs {:OPERAND1 OPERAND1
-            :OPERAND2 OPERAND2}})
+   :inputs {:OPERAND1 (as-input OPERAND1)
+            :OPERAND2 (as-input OPERAND2)}})
 
 (defn op-or [OPERAND1 OPERAND2]
   {:opcode "operator_or"
-   :inputs {:OPERAND1 OPERAND1
-            :OPERAND2 OPERAND2}})
+   :inputs {:OPERAND1 (as-input OPERAND1)
+            :OPERAND2 (as-input OPERAND2)}})
 
 (defn op-equals [OPERAND1 OPERAND2]
   {:opcode "operator_equals"
-   :inputs {:OPERAND1 OPERAND1
-            :OPERAND2 OPERAND2}})
+   :inputs {:OPERAND1 (as-input OPERAND1)
+            :OPERAND2 (as-input OPERAND2)}})
 
 (defn op-gt [OPERAND1 OPERAND2]
   {:opcode "operator_gt"
-   :inputs {:OPERAND1 OPERAND1
-            :OPERAND2 OPERAND2}})
+   :inputs {:OPERAND1 (as-input OPERAND1)
+            :OPERAND2 (as-input OPERAND2)}})
 
 (defn op-+ [NUM1 NUM2]
   {:opcode "operator_add"
-   :inputs {:NUM1 NUM1
-            :NUM2 NUM2}})
+   :inputs {:NUM1 (as-input NUM1)
+            :NUM2 (as-input NUM2)}})
 
 (defn op-- [NUM1 NUM2]
   {:opcode "operator_subtract"
-   :inputs {:NUM1 NUM1
-            :NUM2 NUM2}})
+   :inputs {:NUM1 (as-input NUM1)
+            :NUM2 (as-input NUM2)}})
 
 (defn op-* [NUM1 NUM2]
   {:opcode "operator_multiply"
-   :inputs {:NUM1 NUM1
-            :NUM2 NUM2}})
+   :inputs {:NUM1 (as-input NUM1)
+            :NUM2 (as-input NUM2)}})
 
 (defn op-divide [NUM1 NUM2]
   {:opcode "operator_divide"
-   :inputs {:NUM1 NUM1
-            :NUM2 NUM2}})
-
-(defn data-variable [VARIABLE]
-  {:opcode "data_variable"
-   :fields {:VARIABLE (or (:as-variable VARIABLE) (throw (ex-info "Expected variable" {:variable VARIABLE})))}})
+   :inputs {:NUM1 (as-input NUM1)
+            :NUM2 (as-input NUM2)}})
 
 (defn data-set-variable [VARIABLE VALUE]
   {:opcode "data_setvariableto"
-   :fields {:VARIABLE (or (:as-variable VARIABLE) (throw (ex-info "Expected variable" {:variable VARIABLE})))}
-   :inputs {:VALUE VALUE}})
+   :fields {:VARIABLE (as-variable VARIABLE)}
+   :inputs {:VALUE (as-input VALUE)}})
 
 (defn data-change-variable [VARIABLE VALUE]
   {:opcode "data_changevariableby"
-   :fields {:VARIABLE (or (:as-variable VARIABLE) (throw (ex-info "Expected variable" {:variable VARIABLE})))}
-   :inputs {:VALUE VALUE}})
+   :fields {:VARIABLE (as-variable VARIABLE)}
+   :inputs {:VALUE (as-input VALUE)}})
 
 (defn data-add-to-list [LIST ITEM]
   {:opcode "data_addtolist"
    :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
-   :inputs {:ITEM ITEM}})
+   :inputs {:ITEM (as-input ITEM)}})
 
 (defn data-replace-list-item [LIST INDEX ITEM]
   {:opcode "data_replaceitemoflist"
    :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
-   :inputs {:INDEX INDEX, :ITEM ITEM}})
+   :inputs {:INDEX (as-input INDEX), :ITEM (as-input ITEM)}})
 
 (defn data-delete-from-list [LIST INDEX]
   {:opcode "data_deleteoflist"
    :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
-   :inputs {:INDEX INDEX}})
+   :inputs {:INDEX (if (= :last INDEX)
+                     (number-input "last")
+                     (as-input INDEX))}})
 
 (defn data-delete-all-list [LIST]
   {:opcode "data_deletealloflist"
@@ -133,7 +147,7 @@
 (defn data-item-of-list [LIST INDEX]
   {:opcode "data_itemoflist"
    :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
-   :inputs {:INDEX INDEX}})
+   :inputs {:INDEX (as-input INDEX)}})
 
 (defn data-length-of-list [LIST]
   {:opcode "data_lengthoflist"
@@ -141,27 +155,27 @@
 
 (defn control-if [CONDITION SUBSTACK]
   {:opcode "control_if"
-   :inputs {:CONDITION CONDITION
-            :SUBSTACK SUBSTACK}})
+   :inputs {:CONDITION (as-input CONDITION)
+            :SUBSTACK (as-input SUBSTACK)}})
 
 (defn control-if-else [CONDITION SUBSTACK SUBSTACK2]
   {:opcode "control_if_else"
-   :inputs {:CONDITION CONDITION
-            :SUBSTACK SUBSTACK
-            :SUBSTACK2 SUBSTACK2}})
+   :inputs {:CONDITION (as-input CONDITION)
+            :SUBSTACK (as-input SUBSTACK)
+            :SUBSTACK2 (as-input SUBSTACK2)}})
 
 (defn control-repeat [TIMES SUBSTACK]
   {:opcode "control_repeat"
-   :inputs {:TIMES TIMES
-            :SUBSTACK SUBSTACK}})
+   :inputs {:TIMES (as-input TIMES)
+            :SUBSTACK (as-input SUBSTACK)}})
 
 (defn control-forever [SUBSTACK]
   {:opcode "control_forever"
-   :inputs {:SUBSTACK SUBSTACK}})
+   :inputs {:SUBSTACK (as-input SUBSTACK)}})
 
 (defn control-wait [DURATION]
   {:opcode "control_wait"
-   :inputs {:DURATION DURATION}})
+   :inputs {:DURATION (as-input DURATION)}})
 
 (defn event-broadcast [BROADCAST_INPUT]
   {:opcode "event_broadcast"
@@ -184,11 +198,12 @@
 (defn event-when-broadcast-received [BROADCAST_OPTION & {:as opts}]
   (merge {:opcode "event_whenbroadcastreceived"
           :topLevel true
-          :fields {:BROADCAST_OPTION (or (:as-variable BROADCAST_OPTION) (throw (ex-info "Expected broadcast" {:broadcast BROADCAST_OPTION})))}}
+          :fields {:BROADCAST_OPTION (or (:as-variable BROADCAST_OPTION)
+                                         (throw (ex-info "Expected broadcast" {:broadcast BROADCAST_OPTION})))}}
          opts))
 
-(defn motion-change-x-by [DX] {:opcode "motion_changexby", :inputs {:DX DX}})
-(defn motion-change-y-by [DY] {:opcode "motion_changeyby", :inputs {:DY DY}})
+(defn motion-change-x-by [DX] {:opcode "motion_changexby", :inputs {:DX (as-input DX)}})
+(defn motion-change-y-by [DY] {:opcode "motion_changeyby", :inputs {:DY (as-input DY)}})
 (defn motion-goto-random [] {:opcode "motion_goto",
                              :inputs {:TO {:opcode "motion_goto_menu",
                                            :fields {:TO ["_random_" nil]}}}})
@@ -201,7 +216,7 @@
   (assert (contains? #{:GHOST} EFFECT))
   {:opcode "looks_changeeffectby"
    :fields {:EFFECT [EFFECT nil]}
-   :inputs {:CHANGE CHANGE}})
+   :inputs {:CHANGE (as-input CHANGE)}})
 
 (defn do-block
   "Chain blocks together using :next. Takes multiple blocks and links them sequentially."
