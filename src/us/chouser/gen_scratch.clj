@@ -60,13 +60,16 @@
         (:opcode x) x
         :else (throw (ex-info (str "Unknown input object " (pr-str x)) {:x x}))))
 
+(defn as-list [x]
+  (or (:as-list x) (throw (ex-info "Expected list" {:list x}))))
+
 ;; ============================================================================
 ;; Opcode Constructor Functions
 ;; ============================================================================
 
 (defn op-contains? [LIST ITEM]
   {:opcode "data_listcontainsitem"
-   :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
+   :fields {:LIST (as-list LIST)}
    :inputs {:ITEM (as-input ITEM)}})
 
 (defn op-not [OPERAND]
@@ -125,33 +128,33 @@
 
 (defn data-add-to-list [LIST ITEM]
   {:opcode "data_addtolist"
-   :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
+   :fields {:LIST (as-list LIST)}
    :inputs {:ITEM (as-input ITEM)}})
 
 (defn data-replace-list-item [LIST INDEX ITEM]
   {:opcode "data_replaceitemoflist"
-   :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
+   :fields {:LIST (as-list LIST)}
    :inputs {:INDEX (as-input INDEX), :ITEM (as-input ITEM)}})
 
 (defn data-delete-from-list [LIST INDEX]
   {:opcode "data_deleteoflist"
-   :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
+   :fields {:LIST (as-list LIST)}
    :inputs {:INDEX (if (= :last INDEX)
                      (number-input "last")
                      (as-input INDEX))}})
 
 (defn data-delete-all-list [LIST]
   {:opcode "data_deletealloflist"
-   :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}})
+   :fields {:LIST (as-list LIST)}})
 
 (defn data-item-of-list [LIST INDEX]
   {:opcode "data_itemoflist"
-   :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}
+   :fields {:LIST (as-list LIST)}
    :inputs {:INDEX (as-input INDEX)}})
 
 (defn data-length-of-list [LIST]
   {:opcode "data_lengthoflist"
-   :fields {:LIST (or (:as-list LIST) (throw (ex-info "Expected list" {:list LIST})))}})
+   :fields {:LIST (as-list LIST)}})
 
 (defn control-if [CONDITION SUBSTACK]
   {:opcode "control_if"
