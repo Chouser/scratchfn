@@ -298,21 +298,3 @@
           (.putNextEntry (ZipEntry. (:file-name asset)))
           (.write (.getBytes (:content asset) "UTF-8"))
           (.closeEntry))))))
-
-(defmacro with-ns [ns-specs & body]
-  (let [bindings (mapcat (fn [[selector ns-sym]]
-                           (let [publics (ns-publics
-                                          (or (find-ns ns-sym)
-                                              (get (ns-aliases *ns*) ns-sym)
-                                              (throw (ex-info "no such ns" {:ns-sym ns-sym}))))]
-                             (->> (if (= selector :all)
-                                    publics
-                                    (map (partial find publics) selector))
-                                  (mapcat (fn [[sym var]]
-                                            (when-not (:macro (meta var))
-                                              [sym var]))))))
-                         (partition 2 ns-specs))]
-    `(let [~@bindings]
-       ~@body)))
-
-
