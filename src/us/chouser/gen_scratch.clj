@@ -221,13 +221,512 @@
    :fields {:EFFECT [EFFECT nil]}
    :inputs {:CHANGE (as-input CHANGE)}})
 
+(defn- assoc-final-next [block acc]
+  (assoc block :next (if (:next block)
+                       (assoc-final-next (:next block) acc)
+                       acc)))
+
 (defn do-block
   "Chain blocks together using :next. Takes multiple blocks and links them sequentially."
   [& blocks]
   (reduce (fn [acc block]
-            (assoc block :next acc))
+            (assoc-final-next block acc)
+            #_(assoc block :next acc))
           nil
           (reverse blocks)))
+
+;; ============================================================================
+;; Additional Motion Blocks
+;; ============================================================================
+
+(defn motion-move-steps [STEPS]
+  {:opcode "motion_movesteps"
+   :inputs {:STEPS (as-input STEPS)}})
+
+(defn motion-turn-right [DEGREES]
+  {:opcode "motion_turnright"
+   :inputs {:DEGREES (as-input DEGREES)}})
+
+(defn motion-turn-left [DEGREES]
+  {:opcode "motion_turnleft"
+   :inputs {:DEGREES (as-input DEGREES)}})
+
+(defn motion-goto-xy [X Y]
+  {:opcode "motion_gotoxy"
+   :inputs {:X (as-input X)
+            :Y (as-input Y)}})
+
+(defn motion-goto [TO]
+  {:opcode "motion_goto"
+   :inputs {:TO (as-input TO)}})
+
+(defn motion-glide-secs-to-xy [SECS X Y]
+  {:opcode "motion_glidesecstoxy"
+   :inputs {:SECS (as-input SECS)
+            :X (as-input X)
+            :Y (as-input Y)}})
+
+(defn motion-glide-to [SECS TO]
+  {:opcode "motion_glideto"
+   :inputs {:SECS (as-input SECS)
+            :TO (as-input TO)}})
+
+(defn motion-point-in-direction [DIRECTION]
+  {:opcode "motion_pointindirection"
+   :inputs {:DIRECTION (as-input DIRECTION)}})
+
+(defn motion-point-towards [TOWARDS]
+  {:opcode "motion_pointtowards"
+   :inputs {:TOWARDS (as-input TOWARDS)}})
+
+(defn motion-set-x [X]
+  {:opcode "motion_setx"
+   :inputs {:X (as-input X)}})
+
+(defn motion-set-y [Y]
+  {:opcode "motion_sety"
+   :inputs {:Y (as-input Y)}})
+
+(defn motion-set-rotation-style [STYLE]
+  {:opcode "motion_setrotationstyle"
+   :fields {:STYLE [STYLE nil]}})
+
+(defn motion-direction []
+  {:opcode "motion_direction"})
+
+;; ============================================================================
+;; Additional Looks Blocks
+;; ============================================================================
+
+(defn looks-say-for-secs [MESSAGE SECS]
+  {:opcode "looks_sayforsecs"
+   :inputs {:MESSAGE (as-input MESSAGE)
+            :SECS (as-input SECS)}})
+
+(defn looks-say [MESSAGE]
+  {:opcode "looks_say"
+   :inputs {:MESSAGE (as-input MESSAGE)}})
+
+(defn looks-think-for-secs [MESSAGE SECS]
+  {:opcode "looks_thinkforsecs"
+   :inputs {:MESSAGE (as-input MESSAGE)
+            :SECS (as-input SECS)}})
+
+(defn looks-think [MESSAGE]
+  {:opcode "looks_think"
+   :inputs {:MESSAGE (as-input MESSAGE)}})
+
+(defn looks-switch-costume-to [COSTUME]
+  {:opcode "looks_switchcostumeto"
+   :inputs {:COSTUME (as-input COSTUME)}})
+
+(defn looks-next-costume []
+  {:opcode "looks_nextcostume"})
+
+(defn looks-switch-backdrop-to [BACKDROP]
+  {:opcode "looks_switchbackdropto"
+   :inputs {:BACKDROP (as-input BACKDROP)}})
+
+(defn looks-next-backdrop []
+  {:opcode "looks_nextbackdrop"})
+
+(defn looks-change-size-by [CHANGE]
+  {:opcode "looks_changesizeby"
+   :inputs {:CHANGE (as-input CHANGE)}})
+
+(defn looks-set-size-to [SIZE]
+  {:opcode "looks_setsizeto"
+   :inputs {:SIZE (as-input SIZE)}})
+
+(defn looks-set-effect-to [EFFECT VALUE]
+  {:opcode "looks_seteffectto"
+   :fields {:EFFECT [EFFECT nil]}
+   :inputs {:VALUE (as-input VALUE)}})
+
+(defn looks-clear-effects []
+  {:opcode "looks_cleargraphiceffects"})
+
+(defn looks-go-to-layer [FRONT_BACK]
+  {:opcode "looks_gotofrontback"
+   :fields {:FRONT_BACK [FRONT_BACK nil]}})
+
+(defn looks-go-layers [FORWARD_BACKWARD NUM]
+  {:opcode "looks_goforwardbackwardlayers"
+   :fields {:FORWARD_BACKWARD [FORWARD_BACKWARD nil]}
+   :inputs {:NUM (as-input NUM)}})
+
+(defn looks-costume-number []
+  {:opcode "looks_costumenumbername"
+   :fields {:NUMBER_NAME ["number" nil]}})
+
+(defn looks-costume-name []
+  {:opcode "looks_costumenumbername"
+   :fields {:NUMBER_NAME ["name" nil]}})
+
+(defn looks-backdrop-number []
+  {:opcode "looks_backdropnumbername"
+   :fields {:NUMBER_NAME ["number" nil]}})
+
+(defn looks-backdrop-name []
+  {:opcode "looks_backdropnumbername"
+   :fields {:NUMBER_NAME ["name" nil]}})
+
+(defn looks-size []
+  {:opcode "looks_size"})
+
+;; ============================================================================
+;; Sound Blocks
+;; ============================================================================
+
+(defn sound-play-until-done [SOUND_MENU]
+  {:opcode "sound_playuntildone"
+   :inputs {:SOUND_MENU (as-input SOUND_MENU)}})
+
+(defn sound-play [SOUND_MENU]
+  {:opcode "sound_play"
+   :inputs {:SOUND_MENU (as-input SOUND_MENU)}})
+
+(defn sound-stop-all-sounds []
+  {:opcode "sound_stopallsounds"})
+
+(defn sound-change-effect-by [EFFECT VALUE]
+  {:opcode "sound_changeeffectby"
+   :fields {:EFFECT [EFFECT nil]}
+   :inputs {:VALUE (as-input VALUE)}})
+
+(defn sound-set-effect-to [EFFECT VALUE]
+  {:opcode "sound_seteffectto"
+   :fields {:EFFECT [EFFECT nil]}
+   :inputs {:VALUE (as-input VALUE)}})
+
+(defn sound-clear-effects []
+  {:opcode "sound_cleareffects"})
+
+(defn sound-change-volume-by [VOLUME]
+  {:opcode "sound_changevolumeby"
+   :inputs {:VOLUME (as-input VOLUME)}})
+
+(defn sound-set-volume-to [VOLUME]
+  {:opcode "sound_setvolumeto"
+   :inputs {:VOLUME (as-input VOLUME)}})
+
+(defn sound-volume []
+  {:opcode "sound_volume"})
+
+;; ============================================================================
+;; Additional Event Blocks
+;; ============================================================================
+
+(defn event-when-key-pressed [KEY_OPTION & {:as opts}]
+  (merge {:opcode "event_whenkeypressed"
+          :topLevel true
+          :fields {:KEY_OPTION [KEY_OPTION nil]}}
+         opts))
+
+(defn event-when-backdrop-switches-to [BACKDROP & {:as opts}]
+  (merge {:opcode "event_whenbackdropswitchesto"
+          :topLevel true
+          :fields {:BACKDROP [BACKDROP nil]}}
+         opts))
+
+(defn event-when-greater-than [WHENGREATERTHANMENU VALUE & {:as opts}]
+  (merge {:opcode "event_whengreaterthan"
+          :topLevel true
+          :fields {:WHENGREATERTHANMENU [WHENGREATERTHANMENU nil]}
+          :inputs {:VALUE (as-input VALUE)}}
+         opts))
+
+;; ============================================================================
+;; Additional Control Blocks
+;; ============================================================================
+
+(defn control-repeat-until [CONDITION SUBSTACK]
+  {:opcode "control_repeat_until"
+   :inputs {:CONDITION (as-input CONDITION)
+            :SUBSTACK (as-input SUBSTACK)}})
+
+(defn control-while [CONDITION SUBSTACK]
+  {:opcode "control_while"
+   :inputs {:CONDITION (as-input CONDITION)
+            :SUBSTACK (as-input SUBSTACK)}})
+
+(defn control-for-each [VARIABLE VALUE SUBSTACK]
+  {:opcode "control_for_each"
+   :fields {:VARIABLE (as-variable VARIABLE)}
+   :inputs {:VALUE (as-input VALUE)
+            :SUBSTACK (as-input SUBSTACK)}})
+
+(defn control-stop [STOP_OPTION]
+  {:opcode "control_stop"
+   :fields {:STOP_OPTION [STOP_OPTION nil]}
+   :mutation {:tagName "mutation" :hasnext "false"}})
+
+(defn control-wait-until [CONDITION]
+  {:opcode "control_wait_until"
+   :inputs {:CONDITION (as-input CONDITION)}})
+
+(defn control-create-clone-of [CLONE_OPTION]
+  {:opcode "control_create_clone_of"
+   :inputs {:CLONE_OPTION (as-input CLONE_OPTION)}})
+
+(defn control-delete-this-clone []
+  {:opcode "control_delete_this_clone"})
+
+(defn control-when-start-as-clone [& {:as opts}]
+  (merge {:opcode "control_start_as_clone"
+          :topLevel true}
+         opts))
+
+;; ============================================================================
+;; Sensing Blocks
+;; ============================================================================
+
+(defn sensing-touching-object [TOUCHINGOBJECTMENU]
+  {:opcode "sensing_touchingobject"
+   :inputs {:TOUCHINGOBJECTMENU (as-input TOUCHINGOBJECTMENU)}})
+
+(defn sensing-touching-color [COLOR]
+  {:opcode "sensing_touchingcolor"
+   :inputs {:COLOR (as-input COLOR)}})
+
+(defn sensing-color-touching-color [COLOR COLOR2]
+  {:opcode "sensing_coloristouchingcolor"
+   :inputs {:COLOR (as-input COLOR)
+            :COLOR2 (as-input COLOR2)}})
+
+(defn sensing-distance-to [DISTANCETOMENU]
+  {:opcode "sensing_distanceto"
+   :inputs {:DISTANCETOMENU (as-input DISTANCETOMENU)}})
+
+(defn sensing-ask-and-wait [QUESTION]
+  {:opcode "sensing_askandwait"
+   :inputs {:QUESTION (as-input QUESTION)}})
+
+(defn sensing-answer []
+  {:opcode "sensing_answer"})
+
+(defn sensing-key-pressed [KEY_OPTION]
+  {:opcode "sensing_keypressed"
+   :inputs {:KEY_OPTION (as-input KEY_OPTION)}})
+
+(defn sensing-mouse-down []
+  {:opcode "sensing_mousedown"})
+
+(defn sensing-mouse-x []
+  {:opcode "sensing_mousex"})
+
+(defn sensing-mouse-y []
+  {:opcode "sensing_mousey"})
+
+(defn sensing-set-drag-mode [DRAG_MODE]
+  {:opcode "sensing_setdragmode"
+   :fields {:DRAG_MODE [DRAG_MODE nil]}})
+
+(defn sensing-loudness []
+  {:opcode "sensing_loudness"})
+
+(defn sensing-timer []
+  {:opcode "sensing_timer"})
+
+(defn sensing-reset-timer []
+  {:opcode "sensing_resettimer"})
+
+(defn sensing-of [PROPERTY OBJECT]
+  {:opcode "sensing_of"
+   :fields {:PROPERTY [PROPERTY nil]}
+   :inputs {:OBJECT (as-input OBJECT)}})
+
+(defn sensing-current [CURRENTMENU]
+  {:opcode "sensing_current"
+   :fields {:CURRENTMENU [CURRENTMENU nil]}})
+
+(defn sensing-days-since-2000 []
+  {:opcode "sensing_dayssince2000"})
+
+(defn sensing-username []
+  {:opcode "sensing_username"})
+
+;; ============================================================================
+;; Additional Operator Blocks
+;; ============================================================================
+
+(defn op-lt [OPERAND1 OPERAND2]
+  {:opcode "operator_lt"
+   :inputs {:OPERAND1 (as-input OPERAND1)
+            :OPERAND2 (as-input OPERAND2)}})
+
+(defn op-random [FROM TO]
+  {:opcode "operator_random"
+   :inputs {:FROM (as-input FROM)
+            :TO (as-input TO)}})
+
+(defn op-join [STRING1 STRING2]
+  {:opcode "operator_join"
+   :inputs {:STRING1 (as-input STRING1)
+            :STRING2 (as-input STRING2)}})
+
+(defn op-letter-of [LETTER STRING]
+  {:opcode "operator_letter_of"
+   :inputs {:LETTER (as-input LETTER)
+            :STRING (as-input STRING)}})
+
+(defn op-length [STRING]
+  {:opcode "operator_length"
+   :inputs {:STRING (as-input STRING)}})
+
+(defn op-contains [STRING1 STRING2]
+  {:opcode "operator_contains"
+   :inputs {:STRING1 (as-input STRING1)
+            :STRING2 (as-input STRING2)}})
+
+(defn op-mod [NUM1 NUM2]
+  {:opcode "operator_mod"
+   :inputs {:NUM1 (as-input NUM1)
+            :NUM2 (as-input NUM2)}})
+
+(defn op-round [NUM]
+  {:opcode "operator_round"
+   :inputs {:NUM (as-input NUM)}})
+
+(defn op-mathop [OPERATOR NUM]
+  {:opcode "operator_mathop"
+   :fields {:OPERATOR [OPERATOR nil]}
+   :inputs {:NUM (as-input NUM)}})
+
+;; ============================================================================
+;; Additional Data Blocks
+;; ============================================================================
+
+(defn data-show-variable [VARIABLE]
+  {:opcode "data_showvariable"
+   :fields {:VARIABLE (as-variable VARIABLE)}})
+
+(defn data-hide-variable [VARIABLE]
+  {:opcode "data_hidevariable"
+   :fields {:VARIABLE (as-variable VARIABLE)}})
+
+(defn data-show-list [LIST]
+  {:opcode "data_showlist"
+   :fields {:LIST (as-list LIST)}})
+
+(defn data-hide-list [LIST]
+  {:opcode "data_hidelist"
+   :fields {:LIST (as-list LIST)}})
+
+(defn data-insert-at-list [LIST INDEX ITEM]
+  {:opcode "data_insertatlist"
+   :fields {:LIST (as-list LIST)}
+   :inputs {:INDEX (as-input INDEX)
+            :ITEM (as-input ITEM)}})
+
+(defn data-item-num-of-list [LIST ITEM]
+  {:opcode "data_itemnumoflist"
+   :fields {:LIST (as-list LIST)}
+   :inputs {:ITEM (as-input ITEM)}})
+
+;; ============================================================================
+;; Pen Extension Blocks
+;; ============================================================================
+
+(defn pen-clear []
+  {:opcode "pen_clear"})
+
+(defn pen-stamp []
+  {:opcode "pen_stamp"})
+
+(defn pen-pen-down []
+  {:opcode "pen_penDown"})
+
+(defn pen-pen-up []
+  {:opcode "pen_penUp"})
+
+(defn pen-set-color [COLOR]
+  {:opcode "pen_setPenColorToColor"
+   :inputs {:COLOR (as-input COLOR)}})
+
+(defn pen-change-param-by [COLOR_PARAM VALUE]
+  {:opcode "pen_changePenColorParamBy"
+   :inputs {:COLOR_PARAM (as-input COLOR_PARAM)
+            :VALUE (as-input VALUE)}})
+
+(defn pen-set-param-to [COLOR_PARAM VALUE]
+  {:opcode "pen_setPenColorParamTo"
+   :inputs {:COLOR_PARAM (as-input COLOR_PARAM)
+            :VALUE (as-input VALUE)}})
+
+(defn pen-change-size-by [SIZE]
+  {:opcode "pen_changePenSizeBy"
+   :inputs {:SIZE (as-input SIZE)}})
+
+(defn pen-set-size-to [SIZE]
+  {:opcode "pen_setPenSizeTo"
+   :inputs {:SIZE (as-input SIZE)}})
+
+;; ============================================================================
+;; Music Extension Blocks
+;; ============================================================================
+
+(defn music-play-drum-for-beats [DRUM BEATS]
+  {:opcode "music_playDrumForBeats"
+   :inputs {:DRUM (as-input DRUM)
+            :BEATS (as-input BEATS)}})
+
+(defn music-rest-for-beats [BEATS]
+  {:opcode "music_restForBeats"
+   :inputs {:BEATS (as-input BEATS)}})
+
+(defn music-play-note-for-beats [NOTE BEATS]
+  {:opcode "music_playNoteForBeats"
+   :inputs {:NOTE (as-input NOTE)
+            :BEATS (as-input BEATS)}})
+
+(defn music-set-instrument [INSTRUMENT]
+  {:opcode "music_setInstrument"
+   :inputs {:INSTRUMENT (as-input INSTRUMENT)}})
+
+(defn music-set-tempo [TEMPO]
+  {:opcode "music_setTempo"
+   :inputs {:TEMPO (as-input TEMPO)}})
+
+(defn music-change-tempo [TEMPO]
+  {:opcode "music_changeTempo"
+   :inputs {:TEMPO (as-input TEMPO)}})
+
+(defn music-get-tempo []
+  {:opcode "music_getTempo"})
+
+;; ============================================================================
+;; Video Sensing Extension Blocks
+;; ============================================================================
+
+(defn video-on [ATTRIBUTE SUBJECT]
+  {:opcode "videoSensing_videoOn"
+   :fields {:ATTRIBUTE [ATTRIBUTE nil]}
+   :inputs {:SUBJECT (as-input SUBJECT)}})
+
+(defn video-toggle [VIDEO_STATE]
+  {:opcode "videoSensing_videoToggle"
+   :inputs {:VIDEO_STATE (as-input VIDEO_STATE)}})
+
+(defn video-set-transparency [TRANSPARENCY]
+  {:opcode "videoSensing_setVideoTransparency"
+   :inputs {:TRANSPARENCY (as-input TRANSPARENCY)}})
+
+;; ============================================================================
+;; Text to Speech Extension Blocks
+;; ============================================================================
+
+(defn tts-speak [WORDS]
+  {:opcode "text2speech_speakAndWait"
+   :inputs {:WORDS (as-input WORDS)}})
+
+(defn tts-set-voice [VOICE]
+  {:opcode "text2speech_setVoice"
+   :fields {:VOICE [VOICE nil]}})
+
+(defn tts-set-language [LANGUAGE]
+  {:opcode "text2speech_setLanguage"
+   :fields {:LANGUAGE [LANGUAGE nil]}})
 
 ;; ============================================================================
 ;; Script Generation for Lesson Sprites
@@ -248,7 +747,9 @@
           fields (->> block :fields (flatten-blockmap id))
           inputs (->> block :inputs (flatten-blockmap id))
           next-flat (->> block :next (flatten-block parent-id))]
-      {:top [2 id] ;; refer to block by id
+      {:top (if (= "procedures_prototype" (:opcode block))
+              [1 id]
+              [2 id]) ;; refer to block by id
        :blocks (into [[id (merge {:shadow false
                                   :topLevel false}
                                  block
@@ -296,6 +797,18 @@
                   :as-variable [k id]}])
             ks (repeatedly generate-id))
        (into {})))
+
+(defn create-costume [svg-content name]
+  (let [hash (md5-hash svg-content)
+        md5ext (str hash ".svg")]
+    {:costume {:assetId hash
+               :name name
+               :md5ext md5ext
+               :dataFormat "svg"
+               :rotationCenterX 45
+               :rotationCenterY 30}
+     :file-name md5ext
+     :content svg-content}))
 
 (defn generate-sb3 [output-sb3-path builds]
   (let [assets (cons
