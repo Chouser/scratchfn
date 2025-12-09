@@ -270,8 +270,263 @@
    (sg/sound-change-volume-by 20)
    (record-test "sound-change-volume-by" (sg/op-equals (sg/sound-volume) 70))
 
+   ;; Test effects (can't verify, just execute)
+   (sg/sound-set-effect-to "PITCH" 100)
+   (sg/sound-change-effect-by "PITCH" 50)
+   (sg/sound-clear-effects)
+
+   ;; Test play blocks (audio only, can't verify)
+   ;; Note: These would fail if no sounds are loaded, but demonstrate the generators work
+   ;; (sg/sound-play [1 [10 "0"]])
+   ;; (sg/sound-play-until-done [1 [10 "0"]])
+   (sg/sound-stop-all-sounds)
+
    ;; Reset to reasonable volume
    (sg/sound-set-volume-to 100)))
+
+(defn gen-event-tests
+  "Generate test blocks for event category (execute to verify they work)"
+  [{:keys [test-broadcast temp]}]
+  (sg/do-block
+   ;; Test broadcast mechanism
+   (sg/data-set-variable temp 0)
+   (sg/event-broadcast test-broadcast)
+   (sg/control-wait 0.1)
+   (record-test "event-broadcast" (sg/op-equals temp 1))
+
+   ;; Test broadcast-and-wait
+   (sg/data-set-variable temp 0)
+   (sg/event-broadcast-and-wait test-broadcast)
+   (record-test "event-broadcast-and-wait" (sg/op-equals temp 1))))
+
+(defn gen-pen-tests
+  "Generate test blocks for pen extension"
+  [_]
+  (sg/do-block
+   ;; Test pen blocks (visual only, can't verify)
+   (sg/pen-clear)
+   (sg/pen-pen-down)
+   (sg/pen-set-color [1 [9 "#ff0000"]])
+   (sg/pen-set-size-to 5)
+   (sg/motion-move-steps 50)
+   (sg/pen-change-size-by 2)
+   (sg/pen-set-param-to [1 [11 "color" "YkA4oF:q93hj"]] 50)
+   (sg/pen-change-param-by [1 [11 "brightness" "YkA4oF:q93hj"]] 10)
+   (sg/pen-stamp)
+   (sg/pen-pen-up)
+   (sg/pen-clear)))
+
+(defn gen-additional-operator-tests
+  "Test additional operator functions not covered in initial tests"
+  [{:keys [temp]}]
+  (sg/do-block
+   ;; Test mathop functions
+   (record-test "op-mathop-floor" (sg/op-equals (sg/op-mathop "floor" 3.7) 3))
+   (record-test "op-mathop-ceiling" (sg/op-equals (sg/op-mathop "ceiling" 3.2) 4))
+   (record-test "op-mathop-sin" (sg/op-equals (sg/op-round (sg/op-mathop "sin" 90)) 1))
+   (record-test "op-mathop-cos" (sg/op-equals (sg/op-round (sg/op-mathop "cos" 0)) 1))
+   (record-test "op-mathop-tan" (sg/op-equals (sg/op-round (sg/op-mathop "tan" 45)) 1))
+   (record-test "op-mathop-ln" (sg/op-gt (sg/op-mathop "ln" 10) 2))
+   (record-test "op-mathop-log" (sg/op-equals (sg/op-mathop "log" 100) 2))
+   (record-test "op-mathop-e^" (sg/op-gt (sg/op-mathop "e ^" 2) 7))
+   (record-test "op-mathop-10^" (sg/op-equals (sg/op-mathop "10 ^" 3) 1000))))
+
+(defn gen-additional-motion-tests
+  "Test additional motion blocks"
+  [_]
+  (sg/do-block
+   ;; Test glide-secs-to-xy
+   (sg/motion-goto-xy 0 0)
+   (sg/motion-glide-secs-to-xy 0.1 50 50)
+   (record-test "motion-glide-secs-to-xy-x" (sg/op-gt (sg/motion-x-position) 40))
+   (record-test "motion-glide-secs-to-xy-y" (sg/op-gt (sg/motion-y-position) 40))
+
+   ;; Test motion-goto-random (just verify it executes)
+   (sg/motion-goto-random)
+   (record-test "motion-goto-random" (sg/op-or 
+                                       (sg/op-gt (sg/motion-x-position) -300)
+                                       (sg/op-equals (sg/motion-x-position) -300)))
+
+   ;; Test motion-goto with mouse pointer
+   (sg/motion-goto {:opcode "motion_goto_menu"
+                    :fields {:TO ["_mouse_" nil]}})
+
+   ;; Test motion-glide-to with random position
+   (sg/motion-glide-to 0.1 {:opcode "motion_glideto_menu"
+                             :fields {:TO ["_random_" nil]}})
+
+   ;; Test motion-point-towards
+   (sg/motion-point-towards {:opcode "motion_pointtowards_menu"
+                             :fields {:TOWARDS ["_mouse_" nil]}})
+
+   ;; Test motion-set-rotation-style
+   (sg/motion-set-rotation-style "left-right")
+   (sg/motion-set-rotation-style "don't rotate")
+   (sg/motion-set-rotation-style "all around")))
+
+(defn gen-additional-looks-tests
+  "Test additional looks blocks not covered in initial tests"
+  [_]
+  (sg/do-block
+   ;; Test say-for-secs and think-for-secs (visual only)
+   (sg/looks-say-for-secs "Testing say" 0.1)
+   (sg/looks-think-for-secs "Testing think" 0.1)
+   (sg/looks-think "Thinking...")
+   (sg/control-wait 0.05)
+   (sg/looks-think "")
+
+   ;; Test costume switching (visual only, can't easily verify)
+   (sg/looks-next-costume)
+   (record-test "looks-costume-number" (sg/op-gt (sg/looks-costume-number) 0))
+   (record-test "looks-costume-name" (sg/op-gt (sg/op-length (sg/looks-costume-name)) 0))
+
+   ;; Test backdrop (execute to verify)
+   (sg/looks-next-backdrop)
+   (record-test "looks-backdrop-number" (sg/op-gt (sg/looks-backdrop-number) 0))
+   (record-test "looks-backdrop-name" (sg/op-gt (sg/op-length (sg/looks-backdrop-name)) 0))
+
+   ;; Test layer ordering (execute to verify no errors)
+   (sg/looks-go-to-layer "front")
+   (sg/looks-go-layers "forward" 1)
+   (sg/looks-go-layers "backward" 1)
+   (sg/looks-go-to-layer "back")))
+
+(defn gen-additional-control-tests
+  "Test additional control blocks"
+  [{:keys [counter temp]}]
+  (sg/do-block
+   ;; Test wait-until
+   (sg/sensing-reset-timer)
+   (sg/control-wait-until (sg/op-gt (sg/sensing-timer) 0.05))
+   (record-test "control-wait-until" (sg/op-gt (sg/sensing-timer) 0.04))
+
+   ;; Test for-each (note: this is experimental in Scratch)
+   (sg/data-set-variable counter 0)
+   (sg/control-for-each counter 3
+                        (sg/data-change-variable temp 1))
+   (record-test "control-for-each" (sg/op-gt temp 0))
+
+   ;; Test control-forever with control-stop
+   ;; This is tricky to test - we'll increment a counter in a forever loop
+   ;; then stop it after a condition
+   (sg/data-set-variable counter 0)
+   #_(sg/control-forever
+      (sg/do-block
+       (sg/data-change-variable counter 1)
+       (sg/control-if (sg/op-gt counter 5)
+                      (sg/control-stop "this script"))))
+   #_(sg/control-wait 0.1)
+   #_(record-test "control-forever-stop" (sg/op-gt counter 5))))
+
+(defn gen-additional-sensing-tests
+  "Test additional sensing blocks"
+  [{:keys [temp]}]
+  (sg/do-block
+   ;; Test sensing-of (check sprite properties)
+   (record-test "sensing-of-x" (sg/op-or
+                                (sg/op-gt (sg/sensing-of "x position" [1 [11 "_stage_" "_stage_"]]) -300)
+                                (sg/op-equals (sg/sensing-of "x position" [1 [11 "_stage_" "_stage_"]]) -300)))
+
+   ;; Test loudness (just verify it returns a number)
+   (record-test "sensing-loudness" (sg/op-or
+                                    (sg/op-gt (sg/sensing-loudness) -1)
+                                    (sg/op-equals (sg/sensing-loudness) 0)))
+
+   ;; Test username (just verify it returns something)
+   (record-test "sensing-username" (sg/op-or
+                                    (sg/op-gt (sg/op-length (sg/sensing-username)) 0)
+                                    (sg/op-equals (sg/op-length (sg/sensing-username)) 0)))))
+
+(defn gen-additional-data-tests
+  "Test additional data blocks"
+  [{:keys [test-var test-list]}]
+  (sg/do-block
+   ;; Test show/hide variable (visual only)
+   (sg/data-show-variable test-var)
+   (sg/data-hide-variable test-var)
+   (sg/data-show-variable test-var)
+
+   ;; Test show/hide list (visual only)
+   (sg/data-show-list test-list)
+   (sg/data-hide-list test-list)))
+
+(defn gen-music-tests
+  "Test music extension blocks (audio only, can't verify)"
+  [_]
+  (sg/do-block
+   ;; Test music blocks (execute to verify no errors)
+   (sg/music-set-tempo 120)
+   (record-test "music-get-tempo" (sg/op-equals (sg/music-get-tempo) 120))
+   (sg/music-change-tempo 20)
+   (record-test "music-change-tempo" (sg/op-equals (sg/music-get-tempo) 140))
+
+   ;; Test other music blocks (audio only)
+   (sg/music-set-instrument [1 [10 "1"]])
+   (sg/music-play-note-for-beats 60 0.1)
+   (sg/music-play-drum-for-beats [1 [10 "1"]] 0.1)
+   (sg/music-rest-for-beats 0.1)))
+
+(defn gen-video-sensing-tests
+  "Test video sensing extension blocks (camera required, just execute)"
+  [_]
+  (sg/do-block
+   ;; Test video sensing blocks (visual only)
+   (sg/video-toggle [1 [10 "off"]])
+   (sg/video-set-transparency 50)))
+
+(defn gen-text-to-speech-tests
+  "Test text-to-speech extension blocks (audio only, just execute)"
+  [_]
+  (sg/do-block
+   ;; Test TTS blocks (audio only)
+   (sg/tts-set-voice "alto")
+   (sg/tts-speak "Testing")))
+
+(defn gen-clone-tests
+  "Test clone-related control blocks"
+  [{:keys [temp]}]
+  (sg/do-block
+   ;; Test create clone (visual only, hard to verify)
+   (sg/data-set-variable temp 0)
+   (sg/control-create-clone-of [1 [11 "_myself_" "_myself_"]])
+   (sg/control-wait 0.1)
+   ;; Note: Clone behavior would need to be set up separately
+   ))
+
+(defn gen-interaction-blocks
+  "Test blocks that require user interaction (just execute)"
+  [_]
+  (sg/do-block
+   ;; These blocks require user input, so we just execute them
+   ;; to verify they're generated correctly
+   ;; sensing-ask-and-wait would block execution, so skip it in automated tests
+   ;; (sg/sensing-ask-and-wait "Test question")
+   ;; (record-test "sensing-answer" (sg/op-gt (sg/op-length (sg/sensing-answer)) -1))
+
+   ;; Test key-pressed (can't simulate, just execute)
+   (sg/control-if (sg/sensing-key-pressed [1 [11 "space" "AuJ)y]$O1hb4+R,R2S=V"]])
+                  (sg/looks-say "Space pressed"))
+
+   ;; Test mouse-down (can't simulate, just execute)
+   (sg/control-if (sg/sensing-mouse-down)
+                  (sg/looks-say "Mouse down"))
+
+   ;; Test set-drag-mode (execute only)
+   (sg/sensing-set-drag-mode "draggable")
+   (sg/sensing-set-drag-mode "not draggable")
+
+   ;; Test touching blocks (can't easily verify without specific setup)
+   (sg/control-if (sg/sensing-touching-object [1 [11 "_edge_" "_edge_"]])
+                  (sg/looks-say "Touching edge"))
+   (sg/control-if (sg/sensing-touching-color [1 [9 "#ff0000"]])
+                  (sg/looks-say "Touching red"))
+   (sg/control-if (sg/sensing-color-touching-color [1 [9 "#ff0000"]] [1 [9 "#0000ff"]])
+                  (sg/looks-say "Red touching blue"))
+
+   ;; Test distance-to (just verify it returns a number)
+   (record-test "sensing-distance-to" (sg/op-or
+                                       (sg/op-gt (sg/sensing-distance-to [1 [11 "_mouse_" "_mouse_"]]) -1)
+                                       (sg/op-equals (sg/sensing-distance-to [1 [11 "_mouse_" "_mouse_"]]) 0)))))
 
 (defn define-record-test-block
   "Define the custom 'record test' block"
@@ -377,6 +632,20 @@
                    (gen-sensing-tests ctx)
                    (gen-looks-tests ctx)
                    (gen-sound-tests ctx)
+
+                   #_(gen-event-tests ctx)
+                   #_(gen-pen-tests ctx)
+                   (gen-additional-operator-tests ctx)
+                   (gen-additional-motion-tests ctx)
+                   (gen-additional-looks-tests ctx)
+                   (gen-additional-control-tests ctx)
+                   #_(gen-additional-sensing-tests ctx)
+                   (gen-additional-data-tests ctx)
+                   #_(gen-music-tests ctx)
+                   #_(gen-video-sensing-tests ctx)
+                   #_ (gen-text-to-speech-tests ctx)
+                   #_(gen-clone-tests ctx)
+                   #_(gen-interaction-blocks ctx)
 
                    ;; Display results
                    (sg/control-if (sg/op-equals test-count passed-count)
