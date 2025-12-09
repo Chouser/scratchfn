@@ -60,6 +60,17 @@
         (:opcode x) x
         :else (throw (ex-info (str "Unknown input object " (pr-str x)) {:x x}))))
 
+(declare op-equals)
+
+(defn as-boolean-input [x]
+  (cond (boolean? x) (if x
+                       (op-equals 1 1)
+                       (op-equals 0 2))
+        (:as-variable x) (data-variable x)
+        (:opcode x) x
+        (or (string? x) (number? x)) (throw (ex-info (str "Non-boolean input " (pr-str x)) {:x x}))
+        :else (throw (ex-info (str "Unknown input object " (pr-str x)) {:x x}))))
+
 (defn as-list [x]
   (or (:as-list x) (throw (ex-info "Expected list" {:list x}))))
 
@@ -74,17 +85,17 @@
 
 (defn op-not [OPERAND]
   {:opcode "operator_not"
-   :inputs {:OPERAND (as-input OPERAND)}})
+   :inputs {:OPERAND (as-boolean-input OPERAND)}})
 
 (defn op-and [OPERAND1 OPERAND2]
   {:opcode "operator_and"
-   :inputs {:OPERAND1 (as-input OPERAND1)
-            :OPERAND2 (as-input OPERAND2)}})
+   :inputs {:OPERAND1 (as-boolean-input OPERAND1)
+            :OPERAND2 (as-boolean-input OPERAND2)}})
 
 (defn op-or [OPERAND1 OPERAND2]
   {:opcode "operator_or"
-   :inputs {:OPERAND1 (as-input OPERAND1)
-            :OPERAND2 (as-input OPERAND2)}})
+   :inputs {:OPERAND1 (as-boolean-input OPERAND1)
+            :OPERAND2 (as-boolean-input OPERAND2)}})
 
 (defn op-equals [OPERAND1 OPERAND2]
   {:opcode "operator_equals"
@@ -158,12 +169,12 @@
 
 (defn control-if [CONDITION SUBSTACK]
   {:opcode "control_if"
-   :inputs {:CONDITION (as-input CONDITION)
+   :inputs {:CONDITION (as-boolean-input CONDITION)
             :SUBSTACK (as-input SUBSTACK)}})
 
 (defn control-if-else [CONDITION SUBSTACK SUBSTACK2]
   {:opcode "control_if_else"
-   :inputs {:CONDITION (as-input CONDITION)
+   :inputs {:CONDITION (as-boolean-input CONDITION)
             :SUBSTACK (as-input SUBSTACK)
             :SUBSTACK2 (as-input SUBSTACK2)}})
 

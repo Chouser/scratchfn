@@ -47,13 +47,13 @@
    (record-test "op-gt-false" (sg/op-not (sg/op-gt 5 10)))
    (record-test "op-lt-true" (sg/op-lt 5 10))
    (record-test "op-lt-false" (sg/op-not (sg/op-lt 10 5)))
-   (record-test "op-and-true" (sg/op-and (sg/op-equals 1 1) (sg/op-equals 1 1)))
+   (record-test "op-and-true" (sg/op-and true true))
 
-   (record-test "op-and-false" (sg/op-not (sg/op-and (sg/op-equals 1 1) (sg/op-equals 1 0))))
-   (record-test "op-or-true" (sg/op-or (sg/op-equals 1 1) (sg/op-equals 1 0)))
-   (record-test "op-or-false" (sg/op-not (sg/op-or (sg/op-equals 1 0) (sg/op-equals 1 0))))
-   (record-test "op-not-true" (sg/op-not (sg/op-equals 1 0)))
-   (record-test "op-not-false" (sg/op-not (sg/op-not (sg/op-equals 1 1))))
+   (record-test "op-and-false" (sg/op-not (sg/op-and true false)))
+   (record-test "op-or-true" (sg/op-or true false))
+   (record-test "op-or-false" (sg/op-not (sg/op-or false false)))
+   (record-test "op-not-true" (sg/op-not false))
+   (record-test "op-not-false" (sg/op-not (sg/op-not true)))
 
    ;; Test random (just check it's in range)
    (sg/data-set-variable temp (sg/op-random 1 10))
@@ -62,7 +62,7 @@
 
 (defn gen-motion-tests
   "Generate test blocks for motion category"
-  [vars]
+  [_vars]
   (sg/do-block
    ;; Reset position
    (sg/motion-goto-xy 0 0)
@@ -173,40 +173,40 @@
    (record-test "control-repeat" (sg/op-equals (:counter vars) 5))
 
    ;; Test if (true branch)
-   (sg/data-set-variable (:temp vars) 0)
-   (sg/control-if true
-                  (sg/data-set-variable (:temp vars) 1))
-   (record-test "control-if-true" (sg/op-equals (:temp vars) 1))
+  (sg/data-set-variable (:temp vars) 0)
+  (sg/control-if true
+                 (sg/data-set-variable (:temp vars) 1))
+  (record-test "control-if-true" (sg/op-equals (:temp vars) 1))
 
-   ;; Test if (false branch - should not execute)
-   (sg/data-set-variable (:temp vars) 0)
-   (sg/control-if false
-                  (sg/data-set-variable (:temp vars) 1))
-   (record-test "control-if-false" (sg/op-equals (:temp vars) 0))
+  ;; Test if (false branch - should not execute)
+  (sg/data-set-variable (:temp vars) 0)
+  (sg/control-if false
+                 (sg/data-set-variable (:temp vars) 1))
+  (record-test "control-if-false" (sg/op-equals (:temp vars) 0))
 
-   ;; Test if-else (true branch)
-   (sg/data-set-variable (:temp vars) 0)
-   (sg/control-if-else true
-                       (sg/data-set-variable (:temp vars) 1)
-                       (sg/data-set-variable (:temp vars) 2))
-   (record-test "control-if-else-true" (sg/op-equals (:temp vars) 1))
+  ;; Test if-else (true branch)
+  (sg/data-set-variable (:temp vars) 0)
+  (sg/control-if-else true
+                      (sg/data-set-variable (:temp vars) 1)
+                      (sg/data-set-variable (:temp vars) 2))
+  (record-test "control-if-else-true" (sg/op-equals (:temp vars) 1))
 
-   ;; Test if-else (false branch)
-   (sg/data-set-variable (:temp vars) 0)
-   (sg/control-if-else false
-                       (sg/data-set-variable (:temp vars) 1)
-                       (sg/data-set-variable (:temp vars) 2))
-   (record-test "control-if-else-false" (sg/op-equals (:temp vars) 2))
+  ;; Test if-else (false branch)
+  (sg/data-set-variable (:temp vars) 0)
+  (sg/control-if-else false
+                      (sg/data-set-variable (:temp vars) 1)
+                      (sg/data-set-variable (:temp vars) 2))
+  (record-test "control-if-else-false" (sg/op-equals (:temp vars) 2))
 
-   ;; Test repeat-until
-   (sg/data-set-variable (:counter vars) 0)
-   (sg/control-repeat-until (sg/op-equals (:counter vars) 3)
-                            (sg/data-change-variable (:counter vars) 1))
-   (record-test "control-repeat-until" (sg/op-equals (:counter vars) 3))
+  ;; Test repeat-until
+  (sg/data-set-variable (:counter vars) 0)
+  (sg/control-repeat-until (sg/op-equals (:counter vars) 3)
+                           (sg/data-change-variable (:counter vars) 1))
+  (record-test "control-repeat-until" (sg/op-equals (:counter vars) 3))
 
-   ;; Test wait (verify timer advances)
-   (sg/sensing-reset-timer)
-   (sg/control-wait 0.1)
+  ;; Test wait (verify timer advances)
+  (sg/sensing-reset-timer)
+  (sg/control-wait 0.1)
    (record-test "control-wait" (sg/op-gt (sg/sensing-timer) 0.05))))
 
 (defn gen-sensing-tests
@@ -397,9 +397,9 @@
 
                    ;; Run all test groups sequentially
                    (gen-operator-tests ctx)
-                   #_(gen-motion-tests ctx)
-                   #_(gen-data-tests ctx)
-                   #_(gen-control-tests ctx)
+                   (gen-motion-tests ctx)
+                   (gen-data-tests ctx)
+                   (gen-control-tests ctx)
                    #_(gen-sensing-tests ctx)
                    #_(gen-looks-tests ctx)
                    #_(gen-sound-tests ctx)
