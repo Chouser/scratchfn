@@ -45,6 +45,9 @@
   [value]
   [1 [4 (str value)]])
 
+(defn color [hash-hex-str]
+  {:scratch-literal [1 [9 hash-hex-str]]})
+
 (defn as-variable [x]
   (or (:as-variable x)
       (throw (ex-info "Expected variable" {:variable x}))))
@@ -53,11 +56,16 @@
   {:opcode "data_variable"
    :fields {:VARIABLE (as-variable VARIABLE)}})
 
+(defn as-color-param [kw]
+  ;; eg: :color, :brightness
+  {:scratch-literal [1 [11 kw "YkA4oF:q93hj"]]})
+
 (defn as-input [x]
   (cond (string? x) (text-input x)
         (number? x) (number-input x)
         (boolean? x) (text-input (str x))
         (:as-variable x) (data-variable x)
+        (:scratch-literal x) (:scratch-literal x)
         (:opcode x) x
         :else (throw (ex-info (str "Unknown input object " (pr-str x)) {:x x}))))
 
@@ -658,12 +666,12 @@
 
 (defn pen-change-param-by [COLOR_PARAM VALUE]
   {:opcode "pen_changePenColorParamBy"
-   :inputs {:COLOR_PARAM (as-input COLOR_PARAM)
+   :inputs {:COLOR_PARAM (as-color-param COLOR_PARAM)
             :VALUE (as-input VALUE)}})
 
 (defn pen-set-param-to [COLOR_PARAM VALUE]
   {:opcode "pen_setPenColorParamTo"
-   :inputs {:COLOR_PARAM (as-input COLOR_PARAM)
+   :inputs {:COLOR_PARAM (as-color-param COLOR_PARAM)
             :VALUE (as-input VALUE)}})
 
 (defn pen-change-size-by [SIZE]
@@ -753,24 +761,26 @@
 
 ;; return a seq of [id node], where the first in the sequence is the "top"
 (defn flatten-block [parent-id block]
-  (if-not (map? block)
-    {:top block}
-    (let [id (generate-id)
-          fields (->> block :fields (flatten-blockmap id))
-          inputs (->> block :inputs (flatten-blockmap id))
-          next-flat (->> block :next (flatten-block parent-id))]
-      {:top (if (#{"procedures_prototype" "argument_reporter_string_number" "argument_reporter_boolean"}
-                 (:opcode block))
-              [1 id] ;; shadow block (?) by id
-              [2 id]) ;; refer to block by id
-       :blocks (into [[id (merge {:shadow false
-                                  :topLevel false}
-                                 block
-                                 {:parent parent-id
-                                  :inputs (:map inputs)
-                                  :fields (:map fields)
-                                  :next (second (:top next-flat))})]]
-                     (mapcat :blocks [fields inputs next-flat]))})))
+  (cond
+    (not (map? block)) {:top block}
+    (:scratch-literal block) {:top (:scratch-literal block)}
+    :else
+    , (let [id (generate-id)
+            fields (->> block :fields (flatten-blockmap id))
+            inputs (->> block :inputs (flatten-blockmap id))
+            next-flat (->> block :next (flatten-block parent-id))]
+        {:top (if (#{"procedures_prototype" "argument_reporter_string_number" "argument_reporter_boolean"}
+                   (:opcode block))
+                [1 id] ;; shadow block (?) by id
+                [2 id]) ;; refer to block by id
+         :blocks (into [[id (merge {:shadow false
+                                    :topLevel false}
+                                   block
+                                   {:parent parent-id
+                                    :inputs (:map inputs)
+                                    :fields (:map fields)
+                                    :next (second (:top next-flat))})]]
+                       (mapcat :blocks [fields inputs next-flat]))})))
 
 (defn top-level-block [& blocks]
   (->> (apply do-block blocks) (flatten-block nil) :blocks (into {})))

@@ -2,11 +2,11 @@
   (:require [us.chouser.gen-scratch :as sg]))
 
 ;; TODO
-;; - why do custom blocks not work yet
 ;; - clean up the generation and use of custom blocks, put that in gen-scratch
-;; - why does dragging a variable out of an input _not_ leave behind a place to type!?
-;; - can we generate stable ids everywhere and stop using uuids?
 ;; - rename all generator functions to be more pleasant.
+;; - can a variable be set to a color? Then used as a pen color?
+;; - think more clearly about the two places :scratch-literal is used
+;; - combine pen-drawing and color-touch sensing
 
 ;; ============================================================================
 ;; Test Generator Implementation
@@ -306,12 +306,12 @@
    ;; Test pen blocks (visual only, can't verify)
    (sg/pen-clear)
    (sg/pen-pen-down)
-   (sg/pen-set-color [1 [9 "#ff0000"]])
+   (sg/pen-set-color (sg/color "#ff0000"))
    (sg/pen-set-size-to 5)
    (sg/motion-move-steps 50)
    (sg/pen-change-size-by 2)
-   (sg/pen-set-param-to [1 [11 "color" "YkA4oF:q93hj"]] 50)
-   (sg/pen-change-param-by [1 [11 "brightness" "YkA4oF:q93hj"]] 10)
+   (sg/pen-set-param-to :color 50)
+   (sg/pen-change-param-by :brightness 10)
    (sg/pen-stamp)
    (sg/pen-pen-up)
    (sg/pen-clear)))
@@ -634,7 +634,7 @@
                    (gen-sound-tests ctx)
 
                    #_(gen-event-tests ctx)
-                   #_(gen-pen-tests ctx)
+                   (gen-pen-tests ctx)
                    (gen-additional-operator-tests ctx)
                    (gen-additional-motion-tests ctx)
                    (gen-additional-looks-tests ctx)
