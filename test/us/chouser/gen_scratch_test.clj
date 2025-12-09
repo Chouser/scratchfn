@@ -62,7 +62,7 @@
 
 (defn gen-motion-tests
   "Generate test blocks for motion category"
-  [_vars]
+  [_]
   (sg/do-block
    ;; Reset position
    (sg/motion-goto-xy 0 0)
@@ -113,105 +113,101 @@
 
 (defn gen-data-tests
   "Generate test blocks for data (variables and lists)"
-  [vars]
+  [{:keys [test-var test-list]}]
   (sg/do-block
    ;; Variable tests
-   (sg/data-set-variable (:test-var vars) 42)
-   (record-test "data-set-variable" (sg/op-equals (:test-var vars) 42))
+   (sg/data-set-variable test-var 42)
+   (record-test "data-set-variable" (sg/op-equals test-var 42))
 
-   (sg/data-change-variable (:test-var vars) 8)
-   (record-test "data-change-variable" (sg/op-equals (:test-var vars) 50))
+   (sg/data-change-variable test-var 8)
+   (record-test "data-change-variable" (sg/op-equals test-var 50))
 
    ;; List tests - setup
-   (sg/data-delete-all-list (:test-list vars))
+   (sg/data-delete-all-list test-list)
 
    ;; Test add-to-list
-   (sg/data-add-to-list (:test-list vars) "first")
-   (sg/data-add-to-list (:test-list vars) "second")
-   (sg/data-add-to-list (:test-list vars) "third")
-   (record-test "data-add-to-list-length" (sg/op-equals (sg/data-length-of-list (:test-list vars)) 3))
+   (sg/data-add-to-list test-list "first")
+   (sg/data-add-to-list test-list "second")
+   (sg/data-add-to-list test-list "third")
+   (record-test "data-add-to-list-length" (sg/op-equals (sg/data-length-of-list test-list) 3))
 
    ;; Test item-of-list
-   (sg/data-set-variable (:temp vars) (sg/data-item-of-list (:test-list vars) 1))
-   (record-test "data-item-of-list" (sg/op-equals (:temp vars) "first"))
+   (record-test "data-item-of-list" (sg/op-equals (sg/data-item-of-list test-list 1) "first"))
 
    ;; Test replace-list-item
-   (sg/data-replace-list-item (:test-list vars) 2 "SECOND")
-   (sg/data-set-variable (:temp vars) (sg/data-item-of-list (:test-list vars) 2))
-   (record-test "data-replace-list-item" (sg/op-equals (:temp vars) "SECOND"))
+   (sg/data-replace-list-item test-list 2 "SECOND")
+   (record-test "data-replace-list-item" (sg/op-equals (sg/data-item-of-list test-list 2) "SECOND"))
 
    ;; Test list-contains
-   (record-test "op-contains?-true" (sg/op-contains? (:test-list vars) "third"))
-   (record-test "op-contains?-false" (sg/op-not (sg/op-contains? (:test-list vars) "fourth")))
+   (record-test "op-contains?-true" (sg/op-contains? test-list "third"))
+   (record-test "op-contains?-false" (sg/op-not (sg/op-contains? test-list "fourth")))
 
    ;; Test item-num-of-list
-   (sg/data-set-variable (:temp vars) (sg/data-item-num-of-list (:test-list vars) "third"))
-   (record-test "data-item-num-of-list" (sg/op-equals (:temp vars) 3))
+   (record-test "data-item-num-of-list" (sg/op-equals (sg/data-item-num-of-list test-list "third") 3))
 
    ;; Test insert-at-list
-   (sg/data-insert-at-list (:test-list vars) 1 "zero")
-   (sg/data-set-variable (:temp vars) (sg/data-item-of-list (:test-list vars) 1))
-   (record-test "data-insert-at-list" (sg/op-equals (:temp vars) "zero"))
-   (record-test "data-insert-at-list-length" (sg/op-equals (sg/data-length-of-list (:test-list vars)) 4))
+   (sg/data-insert-at-list test-list 1 "zero")
+   (record-test "data-insert-at-list" (sg/op-equals (sg/data-item-of-list test-list 1) "zero"))
+   (record-test "data-insert-at-list-length" (sg/op-equals (sg/data-length-of-list test-list) 4))
 
    ;; Test delete-from-list
-   (sg/data-delete-from-list (:test-list vars) 1)
-   (record-test "data-delete-from-list-length" (sg/op-equals (sg/data-length-of-list (:test-list vars)) 3))
+   (sg/data-delete-from-list test-list 1)
+   (record-test "data-delete-from-list-length" (sg/op-equals (sg/data-length-of-list test-list) 3))
 
    ;; Test delete-all-list
-   (sg/data-delete-all-list (:test-list vars))
-   (record-test "data-delete-all-list" (sg/op-equals (sg/data-length-of-list (:test-list vars)) 0))))
+   (sg/data-delete-all-list test-list)
+   (record-test "data-delete-all-list" (sg/op-equals (sg/data-length-of-list test-list) 0))))
 
 (defn gen-control-tests
   "Generate test blocks for control flow"
-  [vars]
+  [{:keys [counter temp]}]
   (sg/do-block
    ;; Test repeat
-   (sg/data-set-variable (:counter vars) 0)
+   (sg/data-set-variable counter 0)
    (sg/control-repeat 5
-                      (sg/data-change-variable (:counter vars) 1))
-   (record-test "control-repeat" (sg/op-equals (:counter vars) 5))
+                      (sg/data-change-variable counter 1))
+   (record-test "control-repeat" (sg/op-equals counter 5))
 
    ;; Test if (true branch)
-  (sg/data-set-variable (:temp vars) 0)
-  (sg/control-if true
-                 (sg/data-set-variable (:temp vars) 1))
-  (record-test "control-if-true" (sg/op-equals (:temp vars) 1))
+   (sg/data-set-variable temp 0)
+   (sg/control-if true
+                  (sg/data-set-variable temp 1))
+   (record-test "control-if-true" (sg/op-equals temp 1))
 
-  ;; Test if (false branch - should not execute)
-  (sg/data-set-variable (:temp vars) 0)
-  (sg/control-if false
-                 (sg/data-set-variable (:temp vars) 1))
-  (record-test "control-if-false" (sg/op-equals (:temp vars) 0))
+   ;; Test if (false branch - should not execute)
+   (sg/data-set-variable temp 0)
+   (sg/control-if false
+                  (sg/data-set-variable temp 1))
+   (record-test "control-if-false" (sg/op-equals temp 0))
 
-  ;; Test if-else (true branch)
-  (sg/data-set-variable (:temp vars) 0)
-  (sg/control-if-else true
-                      (sg/data-set-variable (:temp vars) 1)
-                      (sg/data-set-variable (:temp vars) 2))
-  (record-test "control-if-else-true" (sg/op-equals (:temp vars) 1))
+   ;; Test if-else (true branch)
+   (sg/data-set-variable temp 0)
+   (sg/control-if-else true
+                       (sg/data-set-variable temp 1)
+                       (sg/data-set-variable temp 2))
+   (record-test "control-if-else-true" (sg/op-equals temp 1))
 
-  ;; Test if-else (false branch)
-  (sg/data-set-variable (:temp vars) 0)
-  (sg/control-if-else false
-                      (sg/data-set-variable (:temp vars) 1)
-                      (sg/data-set-variable (:temp vars) 2))
-  (record-test "control-if-else-false" (sg/op-equals (:temp vars) 2))
+   ;; Test if-else (false branch)
+   (sg/data-set-variable temp 0)
+   (sg/control-if-else false
+                       (sg/data-set-variable temp 1)
+                       (sg/data-set-variable temp 2))
+   (record-test "control-if-else-false" (sg/op-equals temp 2))
 
-  ;; Test repeat-until
-  (sg/data-set-variable (:counter vars) 0)
-  (sg/control-repeat-until (sg/op-equals (:counter vars) 3)
-                           (sg/data-change-variable (:counter vars) 1))
-  (record-test "control-repeat-until" (sg/op-equals (:counter vars) 3))
+   ;; Test repeat-until
+   (sg/data-set-variable counter 0)
+   (sg/control-repeat-until (sg/op-equals counter 3)
+                            (sg/data-change-variable counter 1))
+   (record-test "control-repeat-until" (sg/op-equals counter 3))
 
-  ;; Test wait (verify timer advances)
-  (sg/sensing-reset-timer)
-  (sg/control-wait 0.1)
+   ;; Test wait (verify timer advances)
+   (sg/sensing-reset-timer)
+   (sg/control-wait 0.1)
    (record-test "control-wait" (sg/op-gt (sg/sensing-timer) 0.05))))
 
 (defn gen-sensing-tests
   "Generate test blocks for sensing category"
-  [vars]
+  [_]
   (sg/do-block
    ;; Test timer
    (sg/sensing-reset-timer)
@@ -238,7 +234,7 @@
 
 (defn gen-looks-tests
   "Generate test blocks for looks category"
-  [_vars]
+  [_]
   (sg/do-block
    ;; Test show/hide
    (sg/looks-show)
@@ -265,7 +261,7 @@
 
 (defn gen-sound-tests
   "Generate test blocks for sound category (can't verify audio, just execute)"
-  [_vars]
+  [_]
   (sg/do-block
    ;; Test volume
    (sg/sound-set-volume-to 50)
@@ -277,8 +273,9 @@
    ;; Reset to reasonable volume
    (sg/sound-set-volume-to 100)))
 
-(defn define-record-test-block [{:keys [test_count passed_count test_results]}]
+(defn define-record-test-block
   "Define the custom 'record test' block"
+  [{:keys [test_count passed_count test_results]}]
   (sg/do-block
    {:opcode "procedures_definition"
     :topLevel true
@@ -332,21 +329,14 @@
   "Generate a comprehensive test project for all block generators"
   []
   (binding [sg/*block-counter* 0]
-    (let [{:keys [test_count passed_count test_results temp] :as ctx}
-          #_(merge (sg/make-stage-variables {:test_count 0
-                                             :passed_count 0})
-                   (sg/make-stage-lists {:test_results []}))
-          #_(merge (sg/make-variables {:temp 0
-                                       :test_var 0
+    (let [{:keys [test_count passed_count test_results] :as ctx}
+          , (merge (sg/make-variables {:test_count 0
+                                       :passed_count 0
+                                       :temp 0
+                                       :test-var 0
                                        :counter 0})
-                   (sg/make-lists {:test_list []}))
-          (merge (sg/make-variables {:test_count 0
-                                     :passed_count 0
-                                     :temp 0
-                                     :test-var 0
-                                     :counter 0})
-                 (sg/make-lists {:test-list []
-                                 :test_results []}))
+                   (sg/make-lists {:test-list []
+                                   :test_results []}))
           backdrop-data (sg/create-costume (generate-stage-backdrop) "backdrop1")
           test-button (sg/create-costume (generate-button-costume "Run Test") "runtest")]
 
