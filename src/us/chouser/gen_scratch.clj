@@ -10,12 +10,9 @@
 ;; Utility Functions
 ;; ============================================================================
 
-(defn generate-id []
-  "Generate a unique ID for Scratch objects"
-  (str (java.util.UUID/randomUUID)))
-
-(defn md5-hash [content]
+(defn md5-hash
   "Calculate MD5 hash of content"
+  [content]
   (let [digest (MessageDigest/getInstance "MD5")
         bytes (.digest digest (.getBytes content "UTF-8"))]
     (apply str (map #(format "%02x" %) bytes))))
@@ -34,14 +31,18 @@
 ;; Block Generation Helpers
 ;; ============================================================================
 
+#_{:clj-kondo/ignore [:uninitialized-var]}
 (def ^:dynamic *block-counter*)
 
-(defn text-input [value]
-  "Create a text input value"
+(defn generate-id []
+  (str "clj" (set! *block-counter* (inc *block-counter*))))
+
+(defn text-input
+  [value]
   [1 [10 value]])
 
-(defn number-input [value]
-  "Create a number input value"
+(defn number-input
+  [value]
   [1 [4 (str value)]])
 
 (defn as-variable [x]
@@ -754,7 +755,7 @@
 (defn flatten-block [parent-id block]
   (if-not (map? block)
     {:top block}
-    (let [id (str "block" (set! *block-counter* (inc *block-counter*)))
+    (let [id (generate-id)
           fields (->> block :fields (flatten-blockmap id))
           inputs (->> block :inputs (flatten-blockmap id))
           next-flat (->> block :next (flatten-block parent-id))]
@@ -839,7 +840,6 @@
                      opts)}))
 
 (defn generate-sb3 [output-sb3-path builds]
-  (println (keep :monitor builds))
   (let [assets (cons
                 {:file-name "project.json"
                  :content (-> {:targets (keep :target builds)

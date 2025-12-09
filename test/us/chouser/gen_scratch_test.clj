@@ -305,15 +305,6 @@
                          {:opcode "argument_reporter_string_number"
                           :fields {:VALUE ["name" nil]}}))))
 
-(defn get-test-block [x]
-  (binding [sg/*block-counter* 0]
-    (sg/flatten-block nil x)))
-
-(get-test-block (define-record-test-block
-                  (merge (sg/make-variables {:test-count 0 :passed-count 1})
-                         (sg/make-lists {:failed-tests []}))))
-(get-test-block (sg/op-and true true))
-
 (defn generate-stage-backdrop []
   "<svg version=\"1.1\" width=\"480\" height=\"360\" viewBox=\"0 0 480 360\">
   <rect width=\"480\" height=\"360\" fill=\"#ffffff\"/>
