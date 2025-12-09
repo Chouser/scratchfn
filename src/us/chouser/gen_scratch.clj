@@ -747,8 +747,9 @@
           fields (->> block :fields (flatten-blockmap id))
           inputs (->> block :inputs (flatten-blockmap id))
           next-flat (->> block :next (flatten-block parent-id))]
-      {:top (if (= "procedures_prototype" (:opcode block))
-              [1 id]
+      {:top (if (#{"procedures_prototype" "argument_reporter_string_number" "argument_reporter_boolean"}
+                 (:opcode block))
+              [1 id] ;; shadow block (?) by id
               [2 id]) ;; refer to block by id
        :blocks (into [[id (merge {:shadow false
                                   :topLevel false}
