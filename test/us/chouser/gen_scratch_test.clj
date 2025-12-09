@@ -219,33 +219,26 @@
    (record-test "sensing-timer" (sg/op-gt (sg/sensing-timer) 0))
 
    ;; Test mouse position (just verify they return numbers, can't control mouse)
-   (sg/data-set-variable (:temp vars) (sg/sensing-mouse-x))
    (record-test "sensing-mouse-x" (sg/op-or
-                                   (sg/op-gt (:temp vars) -300)
-                                   (sg/op-equals (:temp vars) -300)))
+                                   (sg/op-gt (sg/sensing-mouse-x) -300)
+                                   (sg/op-equals (sg/sensing-mouse-x) -300)))
 
-   (sg/data-set-variable (:temp vars) (sg/sensing-mouse-y))
    (record-test "sensing-mouse-y" (sg/op-or
-                                   (sg/op-gt (:temp vars) -300)
-                                   (sg/op-equals (:temp vars) -300)))
+                                   (sg/op-gt (sg/sensing-mouse-y) -300)
+                                   (sg/op-equals (sg/sensing-mouse-y) -300)))
 
    ;; Test current (just verify it returns something)
-   (sg/data-set-variable (:temp vars) (sg/sensing-current "year"))
-   (record-test "sensing-current-year" (sg/op-gt (:temp vars) 2020))
-
-   (sg/data-set-variable (:temp vars) (sg/sensing-current "month"))
+   (record-test "sensing-current-year" (sg/op-gt (sg/sensing-current "year") 2020))
    (record-test "sensing-current-month" (sg/op-and
-                                         (sg/op-gt (:temp vars) 0)
-                                         (sg/op-or (sg/op-lt (:temp vars) 13)
-                                                   (sg/op-equals (:temp vars) 12))))
+                                         (sg/op-gt (sg/sensing-current "month") 0)
+                                         (sg/op-lt (sg/sensing-current "month") 13)))
 
    ;; Test days since 2000
-   (sg/data-set-variable (:temp vars) (sg/sensing-days-since-2000))
-   (record-test "sensing-days-since-2000" (sg/op-gt (:temp vars) 9000))))
+   (record-test "sensing-days-since-2000" (sg/op-gt (sg/sensing-days-since-2000) 9000))))
 
 (defn gen-looks-tests
   "Generate test blocks for looks category"
-  [vars]
+  [_vars]
   (sg/do-block
    ;; Test show/hide
    (sg/looks-show)
@@ -272,7 +265,7 @@
 
 (defn gen-sound-tests
   "Generate test blocks for sound category (can't verify audio, just execute)"
-  [vars]
+  [_vars]
   (sg/do-block
    ;; Test volume
    (sg/sound-set-volume-to 50)
@@ -400,9 +393,9 @@
                    (gen-motion-tests ctx)
                    (gen-data-tests ctx)
                    (gen-control-tests ctx)
-                   #_(gen-sensing-tests ctx)
-                   #_(gen-looks-tests ctx)
-                   #_(gen-sound-tests ctx)
+                   (gen-sensing-tests ctx)
+                   (gen-looks-tests ctx)
+                   (gen-sound-tests ctx)
 
                    ;; Display results
                    (sg/control-if (sg/op-equals test_count passed_count)
