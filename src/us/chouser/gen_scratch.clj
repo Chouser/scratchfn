@@ -822,11 +822,28 @@
      :file-name md5ext
      :content svg-content}))
 
+(defn monitor [obj opts]
+  (let [v (or (:variable obj) (:list obj))
+        [id [k init]] v]
+    {:monitor (merge {:id id
+                      :mode (if (:variable obj) "default" "list")
+                      :opcode (if (:variable obj) "data_variable" "data_listcontents")
+                      :params {:LIST k}
+                      :spriteName nil ;; nil for stage, name for sprite!
+                      :value init
+                      :visible true
+                      :x 5
+                      :y 5
+                      :width 0
+                      :height 0}
+                     opts)}))
+
 (defn generate-sb3 [output-sb3-path builds]
+  (println (keep :monitor builds))
   (let [assets (cons
                 {:file-name "project.json"
-                 :content (-> {:targets (mapv :target builds)
-                               :monitors []
+                 :content (-> {:targets (keep :target builds)
+                               :monitors (keep :monitor builds)
                                :extensions []
                                :meta {:semver "3.0.0"
                                       :vm "0.2.0"

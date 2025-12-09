@@ -275,7 +275,7 @@
 
 (defn define-record-test-block
   "Define the custom 'record test' block"
-  [{:keys [test_count passed_count test_results]}]
+  [{:keys [test-count passed-count failed-tests]}]
   (sg/do-block
    {:opcode "procedures_definition"
     :topLevel true
@@ -296,12 +296,12 @@
                                      :arg1 {:opcode "argument_reporter_boolean"
                                             :shadow true
                                             :fields {:VALUE ["passed" nil]}}}}}}
-   (sg/data-change-variable test_count 1)
+   (sg/data-change-variable test-count 1)
    (sg/control-if-else
     {:opcode "argument_reporter_boolean"
      :fields {:VALUE ["passed" nil]}}
-    (sg/data-change-variable passed_count 1)
-    (sg/data-add-to-list test_results
+    (sg/data-change-variable passed-count 1)
+    (sg/data-add-to-list failed-tests
                          {:opcode "argument_reporter_string_number"
                           :fields {:VALUE ["name" nil]}}))))
 
@@ -310,8 +310,8 @@
     (sg/flatten-block nil x)))
 
 (get-test-block (define-record-test-block
-                  (merge (sg/make-variables {:test_count 0 :passed_count 1})
-                         (sg/make-lists {:test_results []}))))
+                  (merge (sg/make-variables {:test-count 0 :passed-count 1})
+                         (sg/make-lists {:failed-tests []}))))
 (get-test-block (sg/op-and true true))
 
 (defn generate-stage-backdrop []
@@ -329,14 +329,14 @@
   "Generate a comprehensive test project for all block generators"
   []
   (binding [sg/*block-counter* 0]
-    (let [{:keys [test_count passed_count test_results] :as ctx}
-          , (merge (sg/make-variables {:test_count 0
-                                       :passed_count 0
+    (let [{:keys [test-count passed-count failed-tests] :as ctx}
+          , (merge (sg/make-variables {:test-count 0
+                                       :passed-count 0
                                        :temp 0
                                        :test-var 0
                                        :counter 0})
                    (sg/make-lists {:test-list []
-                                   :test_results []}))
+                                   :failed-tests []}))
           backdrop-data (sg/create-costume (generate-stage-backdrop) "backdrop1")
           test-button (sg/create-costume (generate-button-costume "Run Test") "runtest")]
 
@@ -373,9 +373,9 @@
                    (sg/event-when-flag-clicked)
 
                    ;; Initialize
-                   (sg/data-set-variable test_count 0)
-                   (sg/data-set-variable passed_count 0)
-                   (sg/data-delete-all-list test_results)
+                   (sg/data-set-variable test-count 0)
+                   (sg/data-set-variable passed-count 0)
+                   (sg/data-delete-all-list failed-tests)
                    (sg/looks-say "Running tests...")
 
                    ;; Run all test groups sequentially
@@ -388,19 +388,19 @@
                    (gen-sound-tests ctx)
 
                    ;; Display results
-                   (sg/control-if (sg/op-equals test_count passed_count)
+                   (sg/control-if (sg/op-equals test-count passed-count)
                                   (sg/looks-say
                                    (sg/op-join "ALL "
-                                               (sg/op-join test_count " TESTS PASSED ✓"))))
+                                               (sg/op-join test-count " TESTS PASSED ✓"))))
 
-                   (sg/control-if (sg/op-not (sg/op-equals test_count passed_count))
+                   (sg/control-if (sg/op-not (sg/op-equals test-count passed-count))
                                   (sg/do-block
                                    (sg/looks-say
                                     (sg/op-join "FAILED: "
-                                                (sg/op-join (sg/op-- test_count passed_count)
+                                                (sg/op-join (sg/op-- test-count passed-count)
                                                             (sg/op-join " of "
-                                                                        (sg/op-join test_count " tests")))))
-                                   (sg/data-show-list test_results)))))
+                                                                        (sg/op-join test-count " tests")))))
+                                   (sg/data-show-list failed-tests)))))
 
          :costumes [(:costume test-button)]
          :sounds []
@@ -413,7 +413,8 @@
          :direction 90
          :draggable false
          :rotationStyle "all around"}
-        :assets [test-button]}])))
+        :assets [test-button]}
+       (sg/monitor failed-tests {})])))
 
 (defn -main []
   (sg/generate-sb3 "scratch-test.sb3" (generate-test-project))
