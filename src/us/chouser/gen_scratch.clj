@@ -58,7 +58,7 @@
 
 (defn as-color-param [kw]
   ;; eg: :color, :brightness
-  {:scratch-literal [1 [11 kw "YkA4oF:q93hj"]]})
+  {:scratch-literal [1 [11 kw ""]]})
 
 (defn as-input [x]
   (cond (string? x) (text-input x)
@@ -254,6 +254,54 @@
             #_(assoc block :next acc))
           nil
           (reverse blocks)))
+
+;; Custom blocks, "my" blocks, or procedures
+
+(defn proc-handle
+  "Make a object that can be used to define or call a procedure"
+  [proccode argids]
+  (let [type-codes (re-seq #"%[sb]" proccode)]
+    (assert (= (count type-codes) (count argids)))
+    {:proccode proccode
+     :argids argids
+     :type-codes type-codes}))
+
+(defn define-proc [{:keys [proccode argids type-codes]} opts mutation-opts body]
+  (let [arg-names argids
+        arg-blocks
+        , (map (fn [arg-name type-code]
+                 {:fields {:VALUE [arg-name nil]}
+                  :opcode (case type-code
+                            "%s" "argument_reporter_string_number"
+                            "%b" "argument_reporter_boolean")})
+               arg-names type-codes)
+        custom-block
+        , {:opcode "procedures_prototype"
+           :shadow true
+           :mutation (merge {:tagName "mutation"
+                             :children [] ;; ????
+                             :proccode proccode
+                             :argumentids (json/json-str argids)
+                             :argumentnames (json/json-str arg-names)
+                             :argumentdefaults (json/json-str (map (constantly "") argids))}
+                            mutation-opts)
+           :inputs (zipmap argids (->> arg-blocks (map #(assoc % :shadow true))))}]
+    (do-block
+     (merge {:opcode "procedures_definition"
+             :topLevel true
+             :inputs {:custom_block custom-block}}
+            opts)
+     (apply body arg-blocks))))
+
+(defn call-proc [{:keys [proccode argids]} & args]
+  (assert (= (count args) (count argids)))
+  {:opcode "procedures_call"
+   :mutation {:tagName "mutation"
+              :children []
+              :proccode proccode
+              :argumentids (json/json-str argids)
+              :warp "false"}
+   :inputs (zipmap argids (map as-input args))})
 
 ;; ============================================================================
 ;; Additional Motion Blocks

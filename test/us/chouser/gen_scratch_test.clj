@@ -2,7 +2,6 @@
   (:require [us.chouser.gen-scratch :as sg]))
 
 ;; TODO
-;; - clean up the generation and use of custom blocks, put that in gen-scratch
 ;; - rename all generator functions to be more pleasant.
 ;; - can a variable be set to a color? Then used as a pen color?
 ;; - think more clearly about the two places :scratch-literal is used
@@ -12,17 +11,12 @@
 ;; Test Generator Implementation
 ;; ============================================================================
 
+(def record-test-proc (sg/proc-handle "record test %s %b" [:name :passed]))
+
 (defn record-test
   "Generate a call to the custom 'record test' block"
   [test-name passed-condition]
-  {:opcode "procedures_call"
-   :mutation {:tagName "mutation"
-              :children []
-              :proccode "record test %s %b"
-              :argumentids (str "[\"arg0\",\"arg1\"]")
-              :warp "false"}
-   :inputs {:arg0 (sg/as-input test-name)
-            :arg1 (sg/as-input passed-condition)}})
+  (sg/call-proc record-test-proc test-name passed-condition))
 
 (defn gen-operator-tests
   "Generate test blocks for operator category"
@@ -531,34 +525,16 @@
 (defn define-record-test-block
   "Define the custom 'record test' block"
   [{:keys [test-count passed-count failed-tests]}]
-  (sg/do-block
-   {:opcode "procedures_definition"
-    :topLevel true
-    :x 538
-    :y 51
-    :inputs {:custom_block {:opcode "procedures_prototype"
-                            :shadow true
-                            :mutation {:tagName "mutation"
-                                       :children [] ;; ????
-                                       :proccode "record test %s %b"
-                                       :argumentids (str "[\"arg0\",\"arg1\"]")
-                                       :argumentnames (str "[\"name\",\"passed\"]")
-                                       :argumentdefaults (str "[\"nonsense\",\"false\"]")
-                                       :warp "true"}
-                            :inputs {:arg0 {:opcode "argument_reporter_string_number"
-                                            :shadow true
-                                            :fields {:VALUE ["name" nil]}}
-                                     :arg1 {:opcode "argument_reporter_boolean"
-                                            :shadow true
-                                            :fields {:VALUE ["passed" nil]}}}}}}
-   (sg/data-change-variable test-count 1)
-   (sg/control-if-else
-    {:opcode "argument_reporter_boolean"
-     :fields {:VALUE ["passed" nil]}}
-    (sg/data-change-variable passed-count 1)
-    (sg/data-add-to-list failed-tests
-                         {:opcode "argument_reporter_string_number"
-                          :fields {:VALUE ["name" nil]}}))))
+  (sg/define-proc record-test-proc
+    {:x 538 :y 51}
+    {:warp "true"}
+    (fn [name passed]
+      (sg/do-block
+       (sg/data-change-variable test-count 1)
+       (sg/control-if-else
+        passed
+        (sg/data-change-variable passed-count 1)
+        (sg/data-add-to-list failed-tests name))))))
 
 (defn generate-stage-backdrop []
   "<svg version=\"1.1\" width=\"480\" height=\"360\" viewBox=\"0 0 480 360\">
@@ -584,7 +560,8 @@
                    (sg/make-lists {:test-list []
                                    :failed-tests []}))
           backdrop-data (sg/create-costume (generate-stage-backdrop) "backdrop1")
-          test-button (sg/create-costume (generate-button-costume "Run Test") "runtest")]
+          test-button (sg/create-costume (generate-button-costume "Run Test") "runtest")
+          operator-tests (sg/proc-handle "operator tests" [])]
 
       [{:target {:isStage true
                  :name "Stage"
@@ -614,6 +591,12 @@
                   (sg/top-level-block
                    (define-record-test-block ctx))
 
+                  (sg/top-level-block
+                   (sg/define-proc operator-tests
+                     {:x 538 :y 351}
+                     {:warp "true"}
+                     #(gen-operator-tests ctx)))
+
                   ;; Main test script
                   (sg/top-level-block
                    (sg/event-when-flag-clicked)
@@ -625,7 +608,7 @@
                    (sg/looks-say "Running tests...")
 
                    ;; Run all test groups sequentially
-                   (gen-operator-tests ctx)
+                   (sg/call-proc operator-tests)
                    (gen-motion-tests ctx)
                    (gen-data-tests ctx)
                    (gen-control-tests ctx)
@@ -643,7 +626,7 @@
                    (gen-additional-data-tests ctx)
                    #_(gen-music-tests ctx)
                    #_(gen-video-sensing-tests ctx)
-                   #_ (gen-text-to-speech-tests ctx)
+                   #_(gen-text-to-speech-tests ctx)
                    #_(gen-clone-tests ctx)
                    #_(gen-interaction-blocks ctx)
 
