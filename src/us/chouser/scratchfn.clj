@@ -1,4 +1,4 @@
-(ns us.chouser.gen-scratch
+(ns us.chouser.scratchfn
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io])
   (:import [java.util.zip ZipOutputStream ZipEntry]
