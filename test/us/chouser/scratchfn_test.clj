@@ -397,20 +397,20 @@
    ;; Test for-each (note: this is experimental in Scratch)
    ($/data-set-variable counter 0)
    ($/control-for-each counter 3
-                        ($/data-change-variable temp 1))
+                       ($/data-change-variable temp 1))
    (record-test "control-for-each" ($/op-gt temp 0))
 
    ;; Test control-forever with control-stop
    ;; This is tricky to test - we'll increment a counter in a forever loop
    ;; then stop it after a condition
    ($/data-set-variable counter 0)
-   #_($/control-forever
-      ($/do-block
-       ($/data-change-variable counter 1)
-       ($/control-if ($/op-gt counter 5)
-                      ($/control-stop "this script"))))
-   #_($/control-wait 0.1)
-   #_(record-test "control-forever-stop" ($/op-gt counter 5))))
+   ($/control-forever
+    ($/do-block
+     ($/data-change-variable counter 1)
+     ($/control-if ($/op-gt counter 5)
+                   ($/do-block
+                    (record-test "control-forever" ($/op-equals 1 1))
+                    ($/control-stop "this script")))))))
 
 (defn gen-additional-sensing-tests
   "Test additional sensing blocks"

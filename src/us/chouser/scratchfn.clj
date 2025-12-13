@@ -242,6 +242,8 @@
    :inputs {:CHANGE (as-input CHANGE)}})
 
 (defn- assoc-final-next [block acc]
+  (assert (or (nil? acc)
+              (not (#{"control_forever"} (:opcode block)))))
   (assoc block :next (if (:next block)
                        (assoc-final-next (:next block) acc)
                        acc)))
@@ -527,7 +529,7 @@
 (defn control-stop [STOP_OPTION]
   {:opcode "control_stop"
    :fields {:STOP_OPTION [STOP_OPTION nil]}
-   :mutation {:tagName "mutation" :hasnext "false"}})
+   :mutation {:tagName "mutation" :children [] :hasnext "false"}})
 
 (defn control-wait-until [CONDITION]
   {:opcode "control_wait_until"
