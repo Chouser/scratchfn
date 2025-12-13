@@ -736,6 +736,29 @@
 ;; Music Extension Blocks
 ;; ============================================================================
 
+(def instrument-number
+  (zipmap [:piano :electric-piano :organ :guitar :electric-guitar :bass :pizzicato
+           :cello :trombone :clarinet :saxophone :flute :wooden-flute :bassoon
+           :choir :vibraphone :music-box :steel-drum :marimba :synth-lead :synth-pad]
+          (map (comp str inc) (range))))
+
+(defn instrument [k]
+  {:opcode "music_menu_INSTRUMENT"
+   :shadow true
+   :fields {:INSTRUMENT [(if (string? k) k (instrument-number k)), nil]}})
+
+(def drum-number
+  (zipmap [:none :snare-drum :bass-drum :side-stick :crash-cymbal
+           :open-hi-hat :closed-hi-hat :tamborine :hand-clap :claves
+           :wood-block :cowbell :triangle :bongo :conga :cabasa
+           :guiro :vibraslap :cuica]
+          (map (comp str inc) (range))))
+
+(defn drum [k]
+  {:opcode "music_menu_DRUM"
+   :shadow true
+   :fields {:DRUM [(if (string? k) k (drum-number k)), nil]}})
+
 (defn music-play-drum-for-beats [DRUM BEATS]
   {:opcode "music_playDrumForBeats"
    :inputs {:DRUM (as-input DRUM)
@@ -882,6 +905,18 @@
                :rotationCenterY 30}
      :file-name md5ext
      :content svg-content}))
+
+(defn create-sound [wav-content name]
+  (let [hash (md5-hash wav-content)
+        md5ext (str hash ".wav")]
+    {:sound {:assetId hash
+             :name name
+             :md5ext md5ext
+             :dataFormat "wav"
+             :rate 48000
+             :sampleCount 1124}
+     :file-name md5ext
+     :content wav-content}))
 
 (defn monitor [obj opts]
   (let [v (or (:variable obj) (:list obj))

@@ -6,6 +6,7 @@
 ;; - can a variable be set to a color? Then used as a pen color?
 ;; - think more clearly about the two places :scratch-literal is used
 ;; - combine pen-drawing and color-touch sensing
+;; - implement and test generated wav sounds
 
 ;; ============================================================================
 ;; Test Generator Implementation
@@ -455,9 +456,9 @@
    (record-test "music-change-tempo" ($/op-equals ($/music-get-tempo) 140))
 
    ;; Test other music blocks (audio only)
-   ($/music-set-instrument [1 [10 "1"]])
+   ($/music-set-instrument ($/instrument :trombone))
    ($/music-play-note-for-beats 60 0.1)
-   ($/music-play-drum-for-beats [1 [10 "1"]] 0.1)
+   ($/music-play-drum-for-beats ($/drum :bongo) 0.1)
    ($/music-rest-for-beats 0.1)))
 
 (defn gen-video-sensing-tests
@@ -537,7 +538,7 @@
                 #'gen-additional-control-tests
                 #_gen-additional-sensing-tests
                 #'gen-additional-data-tests
-                #_gen-music-tests
+                #'gen-music-tests
                 #_gen-video-sensing-tests
                 #_gen-text-to-speech-tests
                 #_gen-clone-tests
