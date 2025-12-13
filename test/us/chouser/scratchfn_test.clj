@@ -521,6 +521,27 @@
    (record-test "sensing-distance-to" ($/op-or
                                        ($/op-gt ($/sensing-distance-to [1 [11 "_mouse_" "_mouse_"]]) -1)
                                        ($/op-equals ($/sensing-distance-to [1 [11 "_mouse_" "_mouse_"]]) 0)))))
+(def test-vars [#'gen-operator-tests
+                #'gen-motion-tests
+                #'gen-data-tests
+                #'gen-control-tests
+                #'gen-sensing-tests
+                #'gen-looks-tests
+                #'gen-sound-tests
+
+                #_gen-event-tests
+                #'gen-pen-tests
+                #'gen-additional-operator-tests
+                #'gen-additional-motion-tests
+                #'gen-additional-looks-tests
+                #'gen-additional-control-tests
+                #_gen-additional-sensing-tests
+                #'gen-additional-data-tests
+                #_gen-music-tests
+                #_gen-video-sensing-tests
+                #_gen-text-to-speech-tests
+                #_gen-clone-tests
+                #_gen-interaction-blocks])
 
 (defn define-record-test-block
   "Define the custom 'record test' block"
@@ -553,15 +574,18 @@
   (binding [$/*block-counter* 0]
     (let [{:keys [test-count passed-count failed-tests] :as ctx}
           , (merge ($/make-variables {:test-count 0
-                                       :passed-count 0
-                                       :temp 0
-                                       :test-var 0
-                                       :counter 0})
+                                      :passed-count 0
+                                      :temp 0
+                                      :test-var 0
+                                      :counter 0})
                    ($/make-lists {:test-list []
-                                   :failed-tests []}))
+                                  :failed-tests []}))
           backdrop-data ($/create-costume (generate-stage-backdrop) "backdrop1")
           test-button ($/create-costume (generate-button-costume "Run Test") "runtest")
-          operator-tests ($/proc-handle "operator tests" [])]
+          test-handles (->> test-vars (map #(-> % meta :name str
+                                                (->> (re-find #"^gen-(.*)"))
+                                                second
+                                                ($/proc-handle []))))]
 
       [{:target {:isStage true
                  :name "Stage"
@@ -591,11 +615,14 @@
                   ($/top-level-block
                    (define-record-test-block ctx))
 
-                  ($/top-level-block
-                   ($/define-proc operator-tests
-                     {:x 538 :y 351}
-                     {:warp "true"}
-                     #(gen-operator-tests ctx)))
+                  (apply merge
+                         (map (fn [handle v n]
+                                ($/top-level-block
+                                 ($/define-proc handle
+                                   {:x (+ 538 (* n 300)) :y 451}
+                                   {:warp "true"}
+                                   #(v ctx))))
+                              test-handles test-vars (range)))
 
                   ;; Main test script
                   ($/top-level-block
@@ -608,42 +635,22 @@
                    ($/looks-say "Running tests...")
 
                    ;; Run all test groups sequentially
-                   ($/call-proc operator-tests)
-                   (gen-motion-tests ctx)
-                   (gen-data-tests ctx)
-                   (gen-control-tests ctx)
-                   (gen-sensing-tests ctx)
-                   (gen-looks-tests ctx)
-                   (gen-sound-tests ctx)
-
-                   #_(gen-event-tests ctx)
-                   (gen-pen-tests ctx)
-                   (gen-additional-operator-tests ctx)
-                   (gen-additional-motion-tests ctx)
-                   (gen-additional-looks-tests ctx)
-                   (gen-additional-control-tests ctx)
-                   #_(gen-additional-sensing-tests ctx)
-                   (gen-additional-data-tests ctx)
-                   #_(gen-music-tests ctx)
-                   #_(gen-video-sensing-tests ctx)
-                   #_(gen-text-to-speech-tests ctx)
-                   #_(gen-clone-tests ctx)
-                   #_(gen-interaction-blocks ctx)
+                   (apply $/do-block (map $/call-proc test-handles))
 
                    ;; Display results
                    ($/control-if ($/op-equals test-count passed-count)
-                                  ($/looks-say
-                                   ($/op-join "ALL "
-                                               ($/op-join test-count " TESTS PASSED ✓"))))
+                                 ($/looks-say
+                                  ($/op-join "ALL "
+                                             ($/op-join test-count " TESTS PASSED ✓"))))
 
                    ($/control-if ($/op-not ($/op-equals test-count passed-count))
-                                  ($/do-block
-                                   ($/looks-say
-                                    ($/op-join "FAILED: "
-                                                ($/op-join ($/op-- test-count passed-count)
-                                                            ($/op-join " of "
-                                                                        ($/op-join test-count " tests")))))
-                                   ($/data-show-list failed-tests)))))
+                                 ($/do-block
+                                  ($/looks-say
+                                   ($/op-join "FAILED: "
+                                              ($/op-join ($/op-- test-count passed-count)
+                                                         ($/op-join " of "
+                                                                    ($/op-join test-count " tests")))))
+                                  ($/data-show-list failed-tests)))))
 
          :costumes [(:costume test-button)]
          :sounds []
