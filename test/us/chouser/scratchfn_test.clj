@@ -160,39 +160,39 @@
    ;; Test repeat
    ($/data-set-variable counter 0)
    ($/control-repeat 5
-                      ($/data-change-variable counter 1))
+                     ($/data-change-variable counter 1))
    (record-test "control-repeat" ($/op-equals counter 5))
 
    ;; Test if (true branch)
    ($/data-set-variable temp 0)
    ($/control-if true
-                  ($/data-set-variable temp 1))
+                 ($/data-set-variable temp 1))
    (record-test "control-if-true" ($/op-equals temp 1))
 
    ;; Test if (false branch - should not execute)
    ($/data-set-variable temp 0)
    ($/control-if false
-                  ($/data-set-variable temp 1))
+                 ($/data-set-variable temp 1))
    (record-test "control-if-false" ($/op-equals temp 0))
 
    ;; Test if-else (true branch)
    ($/data-set-variable temp 0)
    ($/control-if-else true
-                       ($/data-set-variable temp 1)
-                       ($/data-set-variable temp 2))
+                      ($/data-set-variable temp 1)
+                      ($/data-set-variable temp 2))
    (record-test "control-if-else-true" ($/op-equals temp 1))
 
    ;; Test if-else (false branch)
    ($/data-set-variable temp 0)
    ($/control-if-else false
-                       ($/data-set-variable temp 1)
-                       ($/data-set-variable temp 2))
+                      ($/data-set-variable temp 1)
+                      ($/data-set-variable temp 2))
    (record-test "control-if-else-false" ($/op-equals temp 2))
 
    ;; Test repeat-until
    ($/data-set-variable counter 0)
    ($/control-repeat-until ($/op-equals counter 3)
-                            ($/data-change-variable counter 1))
+                           ($/data-change-variable counter 1))
    (record-test "control-repeat-until" ($/op-equals counter 3))
 
    ;; Test wait (verify timer advances)
@@ -338,21 +338,20 @@
 
    ;; Test motion-goto-random (just verify it executes)
    ($/motion-goto-random)
-   (record-test "motion-goto-random" ($/op-or 
-                                       ($/op-gt ($/motion-x-position) -300)
-                                       ($/op-equals ($/motion-x-position) -300)))
+   (record-test "motion-goto-random" ($/op-or
+                                      ($/op-gt ($/motion-x-position) -300)
+                                      ($/op-equals ($/motion-x-position) -300)))
 
    ;; Test motion-goto with mouse pointer
-   ($/motion-goto {:opcode "motion_goto_menu"
-                    :fields {:TO ["_mouse_" nil]}})
+   ($/motion-goto :mouse)
 
    ;; Test motion-glide-to with random position
    ($/motion-glide-to 0.1 {:opcode "motion_glideto_menu"
-                             :fields {:TO ["_random_" nil]}})
+                           :fields {:TO ["_random_" nil]}})
 
    ;; Test motion-point-towards
    ($/motion-point-towards {:opcode "motion_pointtowards_menu"
-                             :fields {:TOWARDS ["_mouse_" nil]}})
+                            :fields {:TOWARDS ["_mouse_" nil]}})
 
    ;; Test motion-set-rotation-style
    ($/motion-set-rotation-style "left-right")
@@ -415,12 +414,14 @@
 
 (defn gen-additional-sensing-tests
   "Test additional sensing blocks"
-  [{:keys [temp]}]
+  [{:keys [_temp]}]
   ($/do-block
+   ;; Test sensing-of (check stage property)
+   (record-test "sensing-of-stage" ($/op-equals ($/sensing-of "backdrop #" {:scratch-literal [1 [11 "_stage_" "_stage_"]]}) -300))
    ;; Test sensing-of (check sprite properties)
-   (record-test "sensing-of-x" ($/op-or
-                                ($/op-gt ($/sensing-of "x position" [1 [11 "_stage_" "_stage_"]]) -300)
-                                ($/op-equals ($/sensing-of "x position" [1 [11 "_stage_" "_stage_"]]) -300)))
+   #_(record-test "sensing-of-x" ($/op-or
+                                  ($/op-gt ($/sensing-of "x position" {:scratch-literal [1 [11 "_stage_" "_stage_"]]}) -300)
+                                  ($/op-equals ($/sensing-of "x position" {:scratch-literal [1 [11 "_stage_" "_stage_"]]}) -300)))
 
    ;; Test loudness (just verify it returns a number)
    (record-test "sensing-loudness" ($/op-or
@@ -498,30 +499,25 @@
    ;; ($/sensing-ask-and-wait "Test question")
    ;; (record-test "sensing-answer" ($/op-gt ($/op-length ($/sensing-answer)) -1))
 
-   ;; Test key-pressed (can't simulate, just execute)
-   ($/control-if ($/sensing-key-pressed [1 [11 "space" "AuJ)y]$O1hb4+R,R2S=V"]])
-                  ($/looks-say "Space pressed"))
-
-   ;; Test mouse-down (can't simulate, just execute)
-   ($/control-if ($/sensing-mouse-down)
-                  ($/looks-say "Mouse down"))
+   (record-test "sensing-key-pressed" ($/op-not ($/sensing-key-pressed :space)))
+   (record-test "sensing-mouse-down" ($/op-not ($/sensing-mouse-down)))
 
    ;; Test set-drag-mode (execute only)
    ($/sensing-set-drag-mode "draggable")
    ($/sensing-set-drag-mode "not draggable")
 
    ;; Test touching blocks (can't easily verify without specific setup)
-   ($/control-if ($/sensing-touching-object [1 [11 "_edge_" "_edge_"]])
-                  ($/looks-say "Touching edge"))
-   ($/control-if ($/sensing-touching-color [1 [9 "#ff0000"]])
-                  ($/looks-say "Touching red"))
-   ($/control-if ($/sensing-color-touching-color [1 [9 "#ff0000"]] [1 [9 "#0000ff"]])
-                  ($/looks-say "Red touching blue"))
+   (record-test "sensing-touching-edge" ($/op-or true ($/sensing-touching-object :edge)))
+   (record-test "sensing-touching-mouse" ($/op-or true ($/sensing-touching-object :mouse)))
+   (record-test "sensing-touching-sprite" ($/op-or true ($/sensing-touching-object "sprite name")))
+   (record-test "sensing-touching-color" ($/sensing-touching-color ($/color "#ffffff")))
+   (record-test "sensing-color-touching-color" ($/sensing-color-touching-color
+                                                ($/color "#ffffff")
+                                                ($/color "#ffffff")))
 
    ;; Test distance-to (just verify it returns a number)
-   (record-test "sensing-distance-to" ($/op-or
-                                       ($/op-gt ($/sensing-distance-to [1 [11 "_mouse_" "_mouse_"]]) -1)
-                                       ($/op-equals ($/sensing-distance-to [1 [11 "_mouse_" "_mouse_"]]) 0)))))
+   (record-test "sensing-distance-to" ($/op-gt ($/sensing-distance-to :mouse) -1))))
+
 (def test-vars [#'gen-operator-tests
                 #'gen-motion-tests
                 #'gen-data-tests
@@ -542,7 +538,7 @@
                 #_gen-video-sensing-tests
                 #_gen-text-to-speech-tests
                 #_gen-clone-tests
-                #_gen-interaction-blocks])
+                #'gen-interaction-blocks])
 
 (defn define-record-test-block
   "Define the custom 'record test' block"

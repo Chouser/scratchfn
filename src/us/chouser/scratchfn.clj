@@ -227,9 +227,13 @@
 
 (defn motion-change-x-by [DX] {:opcode "motion_changexby", :inputs {:DX (as-input DX)}})
 (defn motion-change-y-by [DY] {:opcode "motion_changeyby", :inputs {:DY (as-input DY)}})
-(defn motion-goto-random [] {:opcode "motion_goto",
-                             :inputs {:TO {:opcode "motion_goto_menu",
-                                           :fields {:TO ["_random_" nil]}}}})
+
+(defn motion-goto-random
+  "deprecated. use (motion-goto :random)"
+  []
+  {:opcode "motion_goto",
+   :inputs {:TO {:opcode "motion_goto_menu",
+                 :fields {:TO ["_random_" nil]}}}})
 
 (defn motion-x-position [] {:opcode "motion_xposition"})
 (defn motion-y-position [] {:opcode "motion_yposition"})
@@ -251,6 +255,7 @@
 (defn do-block
   "Chain blocks together using :next. Takes multiple blocks and links them sequentially."
   [& blocks]
+  (assert (seq blocks))
   (reduce (fn [acc block]
             (assoc-final-next block acc)
             #_(assoc block :next acc))
@@ -328,7 +333,11 @@
 
 (defn motion-goto [TO]
   {:opcode "motion_goto"
-   :inputs {:TO (as-input TO)}})
+   :inputs {:TO {:opcode "motion_goto_menu"
+                 :fields {:TO [(case TO
+                                 :mouse "_mouse_"
+                                 :random "_random_")
+                               nil]}}}})
 
 (defn motion-glide-secs-to-xy [SECS X Y]
   {:opcode "motion_glidesecstoxy"
@@ -551,9 +560,15 @@
 ;; Sensing Blocks
 ;; ============================================================================
 
-(defn sensing-touching-object [TOUCHINGOBJECTMENU]
+(defn sensing-touching-object [x]
   {:opcode "sensing_touchingobject"
-   :inputs {:TOUCHINGOBJECTMENU (as-input TOUCHINGOBJECTMENU)}})
+   :inputs {:TOUCHINGOBJECTMENU {:opcode "sensing_touchingobjectmenu",
+                                 :fields {:TOUCHINGOBJECTMENU
+                                          [(case x
+                                             :mouse "_mouse_"
+                                             :edge "_edge_"
+                                             x)
+                                           nil]}}}})
 
 (defn sensing-touching-color [COLOR]
   {:opcode "sensing_touchingcolor"
@@ -564,9 +579,14 @@
    :inputs {:COLOR (as-input COLOR)
             :COLOR2 (as-input COLOR2)}})
 
-(defn sensing-distance-to [DISTANCETOMENU]
+(defn sensing-distance-to [x]
   {:opcode "sensing_distanceto"
-   :inputs {:DISTANCETOMENU (as-input DISTANCETOMENU)}})
+   :inputs {:DISTANCETOMENU {:opcode "sensing_distancetomenu",
+                             :fields {:DISTANCETOMENU
+                                      [(case x
+                                         :mouse "_mouse_"
+                                         x)
+                                       nil]}}}})
 
 (defn sensing-ask-and-wait [QUESTION]
   {:opcode "sensing_askandwait"
@@ -575,9 +595,18 @@
 (defn sensing-answer []
   {:opcode "sensing_answer"})
 
-(defn sensing-key-pressed [KEY_OPTION]
+(defn sensing-key-pressed [k]
   {:opcode "sensing_keypressed"
-   :inputs {:KEY_OPTION (as-input KEY_OPTION)}})
+   :inputs {:KEY_OPTION {:opcode "sensing_keyoptions"
+                         :fields {:KEY_OPTION [(case k
+                                                 :any "any"
+                                                 :space "space"
+                                                 :right "right arrow"
+                                                 :left "left arrow"
+                                                 :up "up arrow"
+                                                 :down "down arrow"
+                                                 k)
+                                               nil]}}}})
 
 (defn sensing-mouse-down []
   {:opcode "sensing_mousedown"})
