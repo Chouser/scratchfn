@@ -935,6 +935,16 @@
      :file-name md5ext
      :content svg-content}))
 
+(defn create-costume-centered
+  "Create an SVG costume with an explicit rotation center. Useful for backdrops,
+  and asymmetric sprites whose logical origin is not the geometric center of the
+  SVG canvas."
+  [svg-content name rotation-center-x rotation-center-y]
+  (update (create-costume svg-content name)
+          :costume assoc
+          :rotationCenterX rotation-center-x
+          :rotationCenterY rotation-center-y))
+
 (defn create-sound [wav-content name]
   (let [hash (md5-hash wav-content)
         md5ext (str hash ".wav")]
@@ -963,16 +973,28 @@
                       :height 0}
                      opts)}))
 
-(defn generate-sb3 [output-sb3-path builds]
+(defn free-block
+  "Turn a normal command block into a free-floating top-level stack at X/Y.
+  Useful for helper stacks like that do not begin with an event hat block."
+  [block x y]
+  (assoc block :topLevel true :x x :y y))
+
+(defn generate-project-json
+  "Build the `project.json` string for an SB3 archive. `extensions` defaults to
+  an empty vector so callers can opt into extension ids like `\"ev3\"`."
+  [builds & {:keys [extensions] :or {extensions []}}]
+  (-> {:targets (keep :target builds)
+       :monitors (keep :monitor builds)
+       :extensions (vec extensions)
+       :meta {:semver "3.0.0"
+              :vm "0.2.0"
+              :agent ""}}
+      json/write-str))
+
+(defn generate-sb3 [output-sb3-path builds & {:keys [extensions] :or {extensions []}}]
   (let [assets (cons
                 {:file-name "project.json"
-                 :content (-> {:targets (keep :target builds)
-                               :monitors (keep :monitor builds)
-                               :extensions []
-                               :meta {:semver "3.0.0"
-                                      :vm "0.2.0"
-                                      :agent ""}}
-                              json/write-str)}
+                 :content (generate-project-json builds :extensions extensions)}
                 (mapcat :assets builds))]
 
     ;; Write ZIP file
