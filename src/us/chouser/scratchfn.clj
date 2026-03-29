@@ -336,7 +336,8 @@
    :inputs {:TO {:opcode "motion_goto_menu"
                  :fields {:TO [(case TO
                                  :mouse "_mouse_"
-                                 :random "_random_")
+                                 :random "_random_"
+                                 TO)
                                nil]}}}})
 
 (defn motion-glide-secs-to-xy [SECS X Y]
