@@ -96,15 +96,32 @@
                                     (map :datetime) sort last))
         top-5 (->> summary
                    (sort-by (fn [[_ actor-map]] (most-recent-datetime actor-map)))
-                   (take-last 8))]
+                   (take-last 10))]
     (doseq [[[parent-id parent-title] actor-map] top-5]
       (print (str "\n" parent-title " (" parent-id ")"))
-      (clojure.pprint/print-table [:student :url :datetime]
-                                  (for [[username nick] usernames
-                                        {:keys [url datetime]} (get actor-map username)]
-                                    {:student nick
-                                     :datetime datetime
-                                     :url url})))))
+      (print-table [:nick :url :datetime]
+                   (for [[nick username] usernames
+                         {:keys [url datetime]} (get actor-map username)]
+                     {:nick nick
+                      :datetime datetime
+                      :url url})))))
+
+(defn remixes-by-actor [usernames messages]
+  (let [by-actor (->> messages
+                      (filter #(= "remixproject" (:type %)))
+                      (group-by :actor_username))]
+    (doseq [[nick username] usernames]
+      (let [remixes (->> (get by-actor username)
+                         (sort-by :datetime_created))]
+        (print "\n" nick)
+        (if (empty? remixes)
+          (println "\n--NONE--")
+          (print-table [:parent_title :url :datetime]
+                       (for [m remixes]
+                         (merge m
+                                {:url (str "https://scratch.mit.edu/projects/"
+                                           (:project_id m) "/editor/")
+                                 :datetime (:datetime_created m)}))))))))
 
 (comment
   (def secrets (read-string (slurp "secrets.edn")))
@@ -118,9 +135,11 @@
 
   (update-messages-edn!)
 
+  (remixes-by-actor (:usernames secrets) (read-string (slurp "messages.edn")))
+
   (print-remix-tables (:usernames secrets)
                       (summarize-remixes (update-messages-edn!)))
 
   (print-remix-tables (:usernames secrets)
-                      (summarize-remixes (read-string (slurp "messages.edn")))))
-
+                      (summarize-remixes (read-string (slurp "messages.edn"))))
+  )
